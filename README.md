@@ -113,6 +113,12 @@ Run the 30-case evaluation:
 python -m loan_pipeline.eval.run_eval
 ```
 
+Run the ablation study:
+
+```powershell
+python -m loan_pipeline.eval.ablation
+```
+
 ## SDLC Status
 
 - Step 1: Problem Statement complete

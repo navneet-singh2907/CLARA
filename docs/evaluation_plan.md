@@ -24,14 +24,17 @@ The project will use a 30-case gold set:
 
 | Configuration | Extraction | Compliance | Risk | Escalation | Faithfulness | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Agent 1 Only |  | N/A | N/A | N/A |  |  |
-| Agent 2 Only | N/A |  | N/A |  |  |  |
-| Agent 3 Only | N/A | N/A |  |  |  |  |
-| Agent 1 + Agent 2 |  |  | N/A |  |  |  |
-| Agent 1 + Agent 3 |  | N/A |  |  |  |  |
-| Full Pipeline |  |  |  |  |  |  |
-| Full Pipeline + HITL |  |  |  |  |  |  |
-| Single-Agent Baseline |  |  |  |  |  |  |
+| Full Pipeline | 1.0000 | 1.0000 | 0.9000 | 1.0000 | TBD | Current best configuration |
+| No Compliance Checker | 1.0000 | 0.4333 | 0.9000 | 0.9000 | TBD | Shows compliance agent contribution |
+| No Risk Scorer | 1.0000 | 1.0000 | 0.6333 | 1.0000 | TBD | Shows risk agent contribution |
+| Term Extractor Only | 1.0000 | 0.4333 | 0.6333 | 0.5667 | TBD | Agent 1-only baseline |
+| Single-Agent Baseline Stub | 1.0000 | 0.6333 | 0.8000 | 0.8333 | TBD | Coarse single-agent approximation |
+
+Run:
+
+```powershell
+python -m loan_pipeline.eval.ablation
+```
 
 ## Failure Categories
 
