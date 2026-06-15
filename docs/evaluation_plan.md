@@ -41,7 +41,14 @@ The project will use a 30-case gold set:
 - Orchestration Failure
 - Document Quality Failure
 
+The local evaluation runner currently reports failure counts by category. The first baseline run is expected to expose calibration misses rather than hide them.
+
+Run:
+
+```powershell
+python -m loan_pipeline.eval.run_eval
+```
+
 ## Judge Model Agreement
 
 Two judge models will score the same outputs. The report will include exact agreement, within-one-point agreement, average score delta, disagreement cases, and manual adjudication notes.
-

@@ -107,6 +107,12 @@ Run tests:
 pytest
 ```
 
+Run the 30-case evaluation:
+
+```powershell
+python -m loan_pipeline.eval.run_eval
+```
+
 ## SDLC Status
 
 - Step 1: Problem Statement complete
