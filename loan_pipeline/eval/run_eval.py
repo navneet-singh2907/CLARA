@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from loan_pipeline.config import GOLD_SET_JSON, load_sba_demo_cases
+from loan_pipeline.eval.judge import run_local_judge
 from loan_pipeline.eval.metrics import GoldLabel, score_case, summarize_scores
 from loan_pipeline.graph.orchestrator import run_pipeline
 
@@ -14,6 +15,7 @@ def run_eval(gold_path: Path = GOLD_SET_JSON) -> dict[str, Any]:
     gold_labels = load_gold_labels(gold_path)
 
     scores = []
+    judge_scores = []
     failures = []
     failure_counts: dict[str, int] = {}
     for label in gold_labels:
@@ -21,6 +23,7 @@ def run_eval(gold_path: Path = GOLD_SET_JSON) -> dict[str, Any]:
         packet = run_pipeline(loan_case)
         score = score_case(loan_case, packet, label)
         scores.append(score)
+        judge_scores.append(run_local_judge(loan_case, packet, label))
 
         if not all(
             [
@@ -48,6 +51,7 @@ def run_eval(gold_path: Path = GOLD_SET_JSON) -> dict[str, Any]:
 
     return {
         "summary": summarize_scores(scores),
+        "local_judge_summary": summarize_judge_scores(judge_scores),
         "failure_counts": failure_counts,
         "failures": failures,
     }
@@ -84,6 +88,24 @@ def categorize_failure(score) -> str:
     if not score.escalation_correct or not score.outcome_correct:
         return "Orchestration Failure"
     return "Uncategorized Failure"
+
+
+def summarize_judge_scores(judge_scores) -> dict[str, float]:
+    if not judge_scores:
+        return {}
+
+    fields = [
+        "faithfulness",
+        "completeness",
+        "risk_calibration",
+        "compliance_accuracy",
+        "explainability",
+        "overall_score",
+    ]
+    return {
+        field: round(sum(getattr(score, field) for score in judge_scores) / len(judge_scores), 4)
+        for field in fields
+    }
 
 
 if __name__ == "__main__":

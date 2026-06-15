@@ -30,3 +30,5 @@ def test_eval_runner_scores_all_cases() -> None:
     assert result["summary"]["by_tier"]["ambiguous"]["cases"] == 10
     assert result["summary"]["by_tier"]["adversarial"]["cases"] == 10
     assert "failure_counts" in result
+    assert "local_judge_summary" in result
+    assert result["local_judge_summary"]["faithfulness"] >= 1.0

@@ -113,6 +113,8 @@ Run the 30-case evaluation:
 python -m loan_pipeline.eval.run_eval
 ```
 
+The evaluation output includes metric accuracy, failure categories, and local judge-dimension averages.
+
 Run the ablation study:
 
 ```powershell

@@ -55,3 +55,12 @@ python -m loan_pipeline.eval.run_eval
 ## Judge Model Agreement
 
 Two judge models will score the same outputs. The report will include exact agreement, within-one-point agreement, average score delta, disagreement cases, and manual adjudication notes.
+
+Current scaffold:
+
+- Builds a strict JSON-only judge prompt
+- Validates judge responses against required fields
+- Scores a local deterministic judge baseline
+- Reports average local judge dimensions in `python -m loan_pipeline.eval.run_eval`
+
+External judge providers will be added after the local evaluation contract is stable.
