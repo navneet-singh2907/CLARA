@@ -85,9 +85,23 @@ Run the app once implemented:
 streamlit run app.py
 ```
 
+## Cupcake MVP
+
+The first vertical slice uses deterministic sample cases and rules-first agents:
+
+- `CLEAN-001`: straightforward low-risk case
+- `AMB-001`: ambiguous case with missing owner credit report
+- `ADV-001`: adversarial case with prior default and missing documents
+
+Run tests:
+
+```powershell
+pytest
+```
+
 ## SDLC Status
 
 - Step 1: Problem Statement complete
 - Step 2: Architecture Design complete
-- Step 3: Environment & Hygiene in progress
-
+- Step 3: Environment & Hygiene complete
+- Step 4: Cupcake MVP in progress
