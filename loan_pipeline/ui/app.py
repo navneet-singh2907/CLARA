@@ -4,8 +4,8 @@ from dataclasses import asdict
 
 import streamlit as st
 
-from src.data.sample_cases import SAMPLE_CASES, get_sample_case
-from src.graph.orchestrator import run_pipeline_with_state
+from loan_pipeline.config import load_sba_demo_cases
+from loan_pipeline.graph.orchestrator import run_pipeline_with_state
 
 
 st.set_page_config(
@@ -13,14 +13,16 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("Small Business Loan Review Pipeline")
-st.caption("Multi-agent decision support for human loan reviewers.")
+st.title("Small Business Loan Application Review Pipeline")
+st.caption("LangChain + LangGraph architecture, SBA public-data workflow, 30-case gold-set eval.")
 
-case_options = {f"{case.case_id} - {case.borrower_name}": case.case_id for case in SAMPLE_CASES}
-selected_label = st.selectbox("Sample loan case", options=list(case_options.keys()))
+sample_cases = load_sba_demo_cases()
+case_options = {f"{case.case_id} - {case.borrower_name}": case.case_id for case in sample_cases}
+selected_label = st.selectbox("SBA loan case", options=list(case_options.keys()))
 
 if st.button("Run review pipeline", type="primary"):
-    loan_case = get_sample_case(case_options[selected_label])
+    selected_case_id = case_options[selected_label]
+    loan_case = next(case for case in sample_cases if case.case_id == selected_case_id)
     state = run_pipeline_with_state(loan_case)
     packet = state["review_packet"]
 
@@ -61,4 +63,5 @@ if st.button("Run review pipeline", type="primary"):
             }
         )
 else:
-    st.info("Choose a sample case and run the pipeline to generate the first review packet.")
+    st.info("Choose an SBA-style sample case and run the pipeline.")
+

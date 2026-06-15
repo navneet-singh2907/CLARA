@@ -5,10 +5,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .streamlit/secrets.toml
-data/raw/*
-data/processed/*
-data/gold/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/gold/.gitkeep
-
+streamlit*.log
+loan_pipeline/data/*.local.csv
+loan_pipeline/data/*.downloaded.csv

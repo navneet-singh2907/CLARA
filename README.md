@@ -38,23 +38,29 @@ Evaluation includes:
 ## Project Structure
 
 ```text
-app.py
-data/
-  raw/
-  processed/
-  gold/
+loan_pipeline/
+  agents/
+    term_extractor.py
+    compliance_checker.py
+    credit_risk_scorer.py
+  graph/
+    state.py
+    orchestrator.py
+    edges.py
+  eval/
+    gold_set.json
+    judge.py
+    ablation.py
+  ui/
+    app.py
+  data/
+    sba_loans.csv
+  config.py
 docs/
   architecture.md
   evaluation_plan.md
-src/
-  agents/
-  data/
-  eval/
-  graph/
-  reporting/
-  rules/
-  schemas/
-  utils/
+requirements.txt
+README.md
 tests/
 ```
 
@@ -82,7 +88,7 @@ Copy-Item .env.example .env
 Run the app once implemented:
 
 ```powershell
-streamlit run app.py
+streamlit run loan_pipeline/ui/app.py
 ```
 
 ## Cupcake MVP
@@ -104,4 +110,7 @@ pytest
 - Step 1: Problem Statement complete
 - Step 2: Architecture Design complete
 - Step 3: Environment & Hygiene complete
-- Step 4: Cupcake MVP in progress
+- Step 4: Cupcake MVP complete
+- Step 5: Peer Review Iteration complete
+- Step 6: Edge-Case Stress Testing complete
+- Step 7: Ship Early Demo in progress

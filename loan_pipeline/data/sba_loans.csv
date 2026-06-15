@@ -1,0 +1,5 @@
+case_id,borrower_name,industry,naics_code,loan_amount,sba_guaranteed_amount,term_months,jobs_supported,borrower_credit_score,years_in_business,prior_default,missing_documents,notes,difficulty_tier
+CLEAN-001,River City Bakery LLC,Retail bakery,311811,185000,138750,84,11,724,6.5,false,,Stable local bakery requesting working capital and oven upgrades.,clean
+AMB-001,Northline Fabrication Co.,Light manufacturing,332312,640000,544000,120,22,,1.2,false,owner_credit_report,Application references pending contracts but omits owner credit report.,ambiguous
+ADV-001,Summit Event Holdings,Event venue management,711310,950000,902500,36,4,608,0.8,true,tax_returns|beneficial_ownership_certification,Narrative emphasizes projected revenue but discloses prior default and missing beneficial ownership certification in the final paragraph.,adversarial
+

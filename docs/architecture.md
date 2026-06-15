@@ -19,24 +19,22 @@ This design keeps the system modular while preserving an agentic orchestration s
 
 ## Core Modules
 
-- `src/agents/`: agent implementations
-- `src/graph/`: LangGraph state and orchestration
-- `src/schemas/`: Pydantic contracts
-- `src/rules/`: deterministic compliance and risk helpers
-- `src/reporting/`: final human review packet generation
-- `src/eval/`: gold-set evaluation, ablation, judge scoring, and failure analysis
-- `src/data/`: SBA data loading, preprocessing, and sampling
-- `src/utils/`: configuration, logging, and LLM client helpers
+- `loan_pipeline/agents/`: agent implementations
+- `loan_pipeline/graph/`: graph state, orchestration, and edge topology
+- `loan_pipeline/eval/`: gold-set evaluation, ablation, judge scoring, and failure analysis
+- `loan_pipeline/ui/`: Streamlit reviewer interface
+- `loan_pipeline/data/`: SBA loan data
+- `loan_pipeline/config.py`: local configuration and data loading helpers
 
 ## Cupcake MVP Implementation
 
 The first implementation uses deterministic agent functions rather than live LLM calls. This keeps the vertical slice testable while preserving the planned graph boundaries:
 
-- `src/agents/term_extractor.py`
-- `src/agents/compliance_checker.py`
-- `src/agents/credit_risk_scorer.py`
-- `src/graph/orchestrator.py`
-- `src/reporting/synthesizer.py`
+- `loan_pipeline/agents/term_extractor.py`
+- `loan_pipeline/agents/compliance_checker.py`
+- `loan_pipeline/agents/credit_risk_scorer.py`
+- `loan_pipeline/graph/orchestrator.py`
+- `loan_pipeline/graph/edges.py`
 
 Future iterations can replace deterministic internals with LangChain prompts and tools without changing the agent contracts.
 

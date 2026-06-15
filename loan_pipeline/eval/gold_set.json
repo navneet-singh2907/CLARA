@@ -1,0 +1,9 @@
+{
+  "description": "30-case gold set placeholder. Final version will contain 10 clean, 10 ambiguous, and 10 adversarial SBA-derived cases.",
+  "tiers": {
+    "clean": [],
+    "ambiguous": [],
+    "adversarial": []
+  }
+}
+

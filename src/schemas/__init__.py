@@ -1,2 +1,0 @@
-"""Structured pipeline schemas."""
-

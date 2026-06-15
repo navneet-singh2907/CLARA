@@ -1,9 +1,9 @@
-"""Simple risk scoring features for the Cupcake MVP."""
+"""Credit Risk Scorer Agent."""
 
-from src.schemas.loan import ExtractedTerms, RiskResult
+from loan_pipeline.graph.state import ExtractedTerms, RiskResult
 
 
-def score_credit_risk(terms: ExtractedTerms) -> RiskResult:
+def run_credit_risk_scorer(terms: ExtractedTerms) -> RiskResult:
     points = 1
     primary_risk_factors: list[str] = []
     mitigating_factors: list[str] = []

@@ -1,6 +1,6 @@
-"""Deterministic term extractor for the Cupcake MVP."""
+"""Term Extractor Agent."""
 
-from src.schemas.loan import ExtractedTerms, LoanCase
+from loan_pipeline.graph.state import ExtractedTerms, LoanCase
 
 
 def extract_terms(loan_case: LoanCase) -> ExtractedTerms:

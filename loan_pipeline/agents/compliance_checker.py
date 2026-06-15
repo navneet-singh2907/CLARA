@@ -1,9 +1,9 @@
-"""Rules-first compliance checks for the Cupcake MVP."""
+"""Compliance Checker Agent."""
 
-from src.schemas.loan import ComplianceFinding, ComplianceResult, ExtractedTerms
+from loan_pipeline.graph.state import ComplianceFinding, ComplianceResult, ExtractedTerms
 
 
-def check_compliance(terms: ExtractedTerms) -> ComplianceResult:
+def run_compliance_checker(terms: ExtractedTerms) -> ComplianceResult:
     findings: list[ComplianceFinding] = []
 
     if terms.missing_documents:

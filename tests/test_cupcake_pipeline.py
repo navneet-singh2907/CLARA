@@ -1,8 +1,15 @@
 """Cupcake MVP tests."""
 
-from src.data.sample_cases import get_sample_case
-from src.graph.orchestrator import run_pipeline, run_pipeline_with_state
-from src.schemas.loan import LoanCase
+from loan_pipeline.config import load_sba_demo_cases
+from loan_pipeline.graph.orchestrator import run_pipeline, run_pipeline_with_state
+from loan_pipeline.graph.state import LoanCase
+
+
+def get_sample_case(case_id: str) -> LoanCase:
+    for loan_case in load_sba_demo_cases():
+        if loan_case.case_id == case_id:
+            return loan_case
+    raise ValueError(f"Unknown sample case: {case_id}")
 
 
 def test_clean_case_reaches_approve_or_conditional_review() -> None:

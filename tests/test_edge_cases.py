@@ -1,7 +1,7 @@
 """Edge-case stress tests for malformed loan applications."""
 
-from src.graph.orchestrator import run_pipeline
-from src.schemas.loan import LoanCase
+from loan_pipeline.graph.orchestrator import run_pipeline
+from loan_pipeline.graph.state import LoanCase
 
 
 def test_guarantee_cannot_exceed_loan_amount() -> None:
@@ -89,4 +89,3 @@ def test_missing_classification_fields_escalate() -> None:
     assert packet.recommended_outcome == "ESCALATE"
     assert "Industry is required." in packet.human_review_notes
     assert "NAICS code is required." in packet.human_review_notes
-
