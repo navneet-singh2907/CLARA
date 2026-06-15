@@ -121,6 +121,12 @@ Run the ablation study:
 python -m loan_pipeline.eval.ablation
 ```
 
+Run the inter-rater agreement scaffold:
+
+```powershell
+python -m loan_pipeline.eval.inter_rater
+```
+
 ## SDLC Status
 
 - Step 1: Problem Statement complete

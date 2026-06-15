@@ -64,3 +64,20 @@ Current scaffold:
 - Reports average local judge dimensions in `python -m loan_pipeline.eval.run_eval`
 
 External judge providers will be added after the local evaluation contract is stable.
+
+Current inter-rater scaffold:
+
+| Metric | Value |
+| --- | --- |
+| Cases | 30 |
+| Exact Agreement | 0.9533 |
+| Within-One-Point Agreement | 1.0000 |
+| Average Score Delta | 0.0467 |
+| Highest Disagreement Dimension | completeness |
+| Disagreement Cases | 7 |
+
+Run:
+
+```powershell
+python -m loan_pipeline.eval.inter_rater
+```

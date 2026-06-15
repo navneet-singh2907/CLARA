@@ -159,6 +159,48 @@ def run_local_judge(loan_case: LoanCase, packet: ReviewPacket, gold: GoldLabel) 
     )
 
 
+def run_strict_local_judge(loan_case: LoanCase, packet: ReviewPacket, gold: GoldLabel) -> JudgeScore:
+    primary_score = run_local_judge(loan_case, packet, gold)
+    completeness = primary_score.completeness
+    risk_calibration = primary_score.risk_calibration
+    explainability = primary_score.explainability
+
+    if packet.extracted_terms.confidence < 0.80:
+        completeness = max(1, completeness - 1)
+
+    if loan_case.difficulty_tier == "adversarial" and packet.risk.band != gold.expected_risk_band:
+        risk_calibration = 1
+
+    if packet.escalation_required and not packet.human_review_notes:
+        explainability = max(1, explainability - 1)
+
+    dimensions = [
+        primary_score.faithfulness,
+        completeness,
+        risk_calibration,
+        primary_score.compliance_accuracy,
+        explainability,
+    ]
+
+    return JudgeScore(
+        faithfulness=primary_score.faithfulness,
+        completeness=completeness,
+        risk_calibration=risk_calibration,
+        compliance_accuracy=primary_score.compliance_accuracy,
+        explainability=explainability,
+        overall_score=round(sum(dimensions) / len(dimensions)),
+        major_failure_category=_major_failure_category(
+            risk_calibration=risk_calibration,
+            compliance_accuracy=primary_score.compliance_accuracy,
+            completeness=completeness,
+        ),
+        rationale=(
+            "Strict local judge scaffold applies a harsher penalty for low-confidence "
+            "extraction and adversarial risk miscalibration."
+        ),
+    )
+
+
 def _major_failure_category(
     risk_calibration: int,
     compliance_accuracy: int,
