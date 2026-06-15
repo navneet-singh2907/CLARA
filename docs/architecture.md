@@ -2,7 +2,7 @@
 
 ## Decision
 
-Use a hybrid LangGraph DAG:
+Use a hybrid LangGraph DAG implemented with a compiled `StateGraph`:
 
 ```text
 Loan Case
@@ -28,7 +28,7 @@ This design keeps the system modular while preserving an agentic orchestration s
 
 ## Cupcake MVP Implementation
 
-The first implementation uses deterministic agent functions rather than live LLM calls. This keeps the vertical slice testable while preserving the planned graph boundaries:
+The first implementation uses deterministic agent functions rather than live LLM calls. The orchestrator is already a compiled LangGraph `StateGraph`, which keeps the vertical slice testable while preserving the planned graph boundaries:
 
 - `loan_pipeline/agents/term_extractor.py`
 - `loan_pipeline/agents/compliance_checker.py`

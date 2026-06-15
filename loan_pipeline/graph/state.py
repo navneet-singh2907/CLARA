@@ -1,7 +1,7 @@
 """Shared graph state and loan review contracts."""
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Literal, TypedDict
 
 RiskBand = Literal["LOW", "MEDIUM", "HIGH"]
 ReviewOutcome = Literal["APPROVE", "CONDITIONAL_REVIEW", "ESCALATE", "REJECT"]
@@ -81,7 +81,14 @@ class ReviewPacket:
     human_review_notes: list[str]
 
 
-GraphState = dict[str, Any]
+class GraphState(TypedDict):
+    loan_case: LoanCase
+    extracted_terms: ExtractedTerms | None
+    validation_errors: list[str]
+    compliance: ComplianceResult | None
+    risk: RiskResult | None
+    review_packet: ReviewPacket | None
+    agent_errors: list[str]
 
 
 def initial_state(loan_case: LoanCase) -> GraphState:
@@ -131,4 +138,3 @@ def validate_terms_node(state: GraphState) -> GraphState:
         errors.append("Years in business cannot be negative.")
 
     return {"validation_errors": errors}
-

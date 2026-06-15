@@ -15,6 +15,8 @@ The pipeline uses a hybrid LangGraph DAG:
 5. Orchestrator resolves contradictions and prepares a human review packet.
 6. Evaluation Harness scores the system against a 30-case gold set.
 
+The current orchestrator is backed by a compiled LangGraph `StateGraph`.
+
 ## Evaluation Standard
 
 The evaluation harness is a first-class subsystem.
@@ -93,7 +95,7 @@ streamlit run loan_pipeline/ui/app.py
 
 ## Cupcake MVP
 
-The first vertical slice uses deterministic sample cases and rules-first agents:
+The first vertical slice uses SBA-style sample cases, rules-first agents, and a compiled LangGraph workflow:
 
 - `CLEAN-001`: straightforward low-risk case
 - `AMB-001`: ambiguous case with missing owner credit report
