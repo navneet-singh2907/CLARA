@@ -2,6 +2,7 @@
 
 from src.data.sample_cases import get_sample_case
 from src.graph.orchestrator import run_pipeline, run_pipeline_with_state
+from src.schemas.loan import LoanCase
 
 
 def test_clean_case_reaches_approve_or_conditional_review() -> None:
@@ -25,6 +26,39 @@ def test_adversarial_case_escalates() -> None:
     assert packet.human_review_notes
 
 
+def test_ambiguous_case_requires_conditional_review() -> None:
+    packet = run_pipeline(get_sample_case("AMB-001"))
+
+    assert packet.case_id == "AMB-001"
+    assert packet.compliance.status == "FAIL"
+    assert packet.recommended_outcome == "ESCALATE"
+    assert "Extraction confidence is below target threshold." in packet.human_review_notes
+
+
+def test_validation_errors_force_human_review() -> None:
+    invalid_case = LoanCase(
+        case_id="INVALID-001",
+        borrower_name="",
+        industry="Unknown",
+        naics_code="000000",
+        loan_amount=0,
+        sba_guaranteed_amount=0,
+        term_months=0,
+        jobs_supported=0,
+        borrower_credit_score=700,
+        years_in_business=3,
+        prior_default=False,
+    )
+
+    packet = run_pipeline(invalid_case)
+
+    assert packet.recommended_outcome != "APPROVE"
+    assert packet.escalation_required
+    assert "Loan amount must be greater than zero." in packet.human_review_notes
+    assert "Loan term must be greater than zero months." in packet.human_review_notes
+    assert "Borrower name is required." in packet.human_review_notes
+
+
 def test_pipeline_exposes_intermediate_state() -> None:
     state = run_pipeline_with_state(get_sample_case("AMB-001"))
 
@@ -32,4 +66,3 @@ def test_pipeline_exposes_intermediate_state() -> None:
     assert state["compliance"] is not None
     assert state["risk"] is not None
     assert state["review_packet"] is not None
-

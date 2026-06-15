@@ -25,7 +25,7 @@ def synthesize_review_packet(
 
     escalation_required = bool(human_review_notes)
 
-    if compliance.status == "FAIL" or risk.band == "HIGH":
+    if validation_errors or compliance.status == "FAIL" or risk.band == "HIGH":
         recommended_outcome = "ESCALATE"
     elif compliance.status == "REVIEW" or risk.band == "MEDIUM":
         recommended_outcome = "CONDITIONAL_REVIEW"
@@ -47,4 +47,3 @@ def synthesize_review_packet(
         risk=risk,
         human_review_notes=human_review_notes,
     )
-

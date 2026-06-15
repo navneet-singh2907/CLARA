@@ -40,6 +40,10 @@ The first implementation uses deterministic agent functions rather than live LLM
 
 Future iterations can replace deterministic internals with LangChain prompts and tools without changing the agent contracts.
 
+## Validation Gate Behavior
+
+Validation errors force escalation. A loan case cannot receive an approve recommendation when required identifiers, numeric fields, borrower classifications, or financial consistency checks fail.
+
 ## Agent Contract
 
 Each agent receives graph state and returns a partial state update. Agents must not mutate unrelated fields. Outputs should be structured, confidence-scored, and auditable.
