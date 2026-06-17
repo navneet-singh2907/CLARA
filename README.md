@@ -102,6 +102,8 @@ Run the app once implemented:
 streamlit run loan_pipeline/ui/app.py
 ```
 
+The dashboard includes loan review, evaluation metrics, ablation results, judge agreement, and report preview tabs.
+
 ## Cupcake MVP
 
 The first vertical slice uses SBA-style sample cases, rules-first agents, and a compiled LangGraph workflow:
