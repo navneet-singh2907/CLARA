@@ -1,6 +1,9 @@
 """Project configuration and local data helpers."""
 
 import csv
+import os
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from loan_pipeline.graph.state import LoanCase
@@ -8,6 +11,28 @@ from loan_pipeline.graph.state import LoanCase
 PROJECT_ROOT = Path(__file__).resolve().parent
 SBA_LOANS_CSV = PROJECT_ROOT / "data" / "sba_loans.csv"
 GOLD_SET_JSON = PROJECT_ROOT / "eval" / "gold_set.json"
+
+
+@dataclass(frozen=True)
+class Settings:
+    app_env: str
+    use_llm_agents: bool
+    openai_api_key: str | None
+    openai_model: str
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings(
+        app_env=os.getenv("APP_ENV", "local"),
+        use_llm_agents=_env_bool("USE_LLM_AGENTS", default=False),
+        openai_api_key=os.getenv("OPENAI_API_KEY") or None,
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+    )
+
+
+def reset_settings_cache() -> None:
+    get_settings.cache_clear()
 
 
 def load_sba_demo_cases(path: Path = SBA_LOANS_CSV) -> list[LoanCase]:
@@ -38,3 +63,9 @@ def _row_to_loan_case(row: dict[str, str]) -> LoanCase:
         difficulty_tier=row["difficulty_tier"],
     )
 
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}

@@ -57,6 +57,7 @@ class ComplianceResult:
     status: Literal["PASS", "REVIEW", "FAIL"]
     findings: list[ComplianceFinding]
     confidence: float
+    reviewer_note: str = ""
 
 
 @dataclass(frozen=True)

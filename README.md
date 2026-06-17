@@ -87,6 +87,15 @@ Copy environment variables:
 Copy-Item .env.example .env
 ```
 
+Optional LLM agent mode:
+
+```text
+USE_LLM_AGENTS=false
+OPENAI_MODEL=gpt-4o-mini
+```
+
+The default deterministic mode keeps evaluation reproducible. Set `USE_LLM_AGENTS=true` with `OPENAI_API_KEY` to enable LangChain-backed agent calls.
+
 Run the app once implemented:
 
 ```powershell

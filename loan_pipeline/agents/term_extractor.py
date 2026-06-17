@@ -1,9 +1,18 @@
 """Term Extractor Agent."""
 
+from loan_pipeline.config import get_settings
 from loan_pipeline.graph.state import ExtractedTerms, LoanCase
+from loan_pipeline.llm.client import extract_terms_with_llm
 
 
 def extract_terms(loan_case: LoanCase) -> ExtractedTerms:
+    if get_settings().use_llm_agents:
+        return extract_terms_with_llm(loan_case)
+
+    return extract_terms_deterministic(loan_case)
+
+
+def extract_terms_deterministic(loan_case: LoanCase) -> ExtractedTerms:
     warnings: list[str] = []
     confidence = 0.95
 
@@ -39,4 +48,3 @@ def extract_terms(loan_case: LoanCase) -> ExtractedTerms:
         confidence=max(confidence, 0.40),
         warnings=warnings,
     )
-

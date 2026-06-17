@@ -36,7 +36,13 @@ The first implementation uses deterministic agent functions rather than live LLM
 - `loan_pipeline/graph/orchestrator.py`
 - `loan_pipeline/graph/edges.py`
 
-Future iterations can replace deterministic internals with LangChain prompts and tools without changing the agent contracts.
+The public agent functions support optional LangChain-backed behavior behind `USE_LLM_AGENTS=true`. Deterministic mode remains the default so tests and evaluation stay reproducible without API keys.
+
+LLM mode:
+
+- Term Extractor can call a LangChain prompt for structured extraction.
+- Compliance Checker keeps rule findings and can request an LLM reviewer note.
+- Credit Risk Scorer keeps deterministic score/band and can request an LLM rationale.
 
 ## Validation Gate Behavior
 

@@ -1,9 +1,18 @@
 """Credit Risk Scorer Agent."""
 
+from loan_pipeline.config import get_settings
 from loan_pipeline.graph.state import ExtractedTerms, RiskResult
+from loan_pipeline.llm.client import add_llm_risk_rationale
 
 
 def run_credit_risk_scorer(terms: ExtractedTerms) -> RiskResult:
+    result = run_credit_risk_scorer_deterministic(terms)
+    if get_settings().use_llm_agents:
+        return add_llm_risk_rationale(terms, result)
+    return result
+
+
+def run_credit_risk_scorer_deterministic(terms: ExtractedTerms) -> RiskResult:
     points = 1
     primary_risk_factors: list[str] = []
     mitigating_factors: list[str] = []
@@ -62,4 +71,3 @@ def run_credit_risk_scorer(terms: ExtractedTerms) -> RiskResult:
         mitigating_factors=mitigating_factors,
         rationale=rationale,
     )
-
