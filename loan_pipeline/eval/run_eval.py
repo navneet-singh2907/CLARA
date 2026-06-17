@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from loan_pipeline.config import GOLD_SET_JSON, load_sba_demo_cases
+from loan_pipeline.eval.calibration import risk_calibration_points, summarize_confidence_calibration
 from loan_pipeline.eval.judge import run_local_judge
 from loan_pipeline.eval.metrics import GoldLabel, score_case, summarize_scores
 from loan_pipeline.graph.orchestrator import run_pipeline
@@ -18,9 +19,11 @@ def run_eval(gold_path: Path = GOLD_SET_JSON) -> dict[str, Any]:
     judge_scores = []
     failures = []
     failure_counts: dict[str, int] = {}
+    packets_by_case = {}
     for label in gold_labels:
         loan_case = cases[label.case_id]
         packet = run_pipeline(loan_case)
+        packets_by_case[label.case_id] = packet
         score = score_case(loan_case, packet, label)
         scores.append(score)
         judge_scores.append(run_local_judge(loan_case, packet, label))
@@ -51,6 +54,9 @@ def run_eval(gold_path: Path = GOLD_SET_JSON) -> dict[str, Any]:
 
     return {
         "summary": summarize_scores(scores),
+        "risk_confidence_calibration": summarize_confidence_calibration(
+            risk_calibration_points(packets_by_case, scores)
+        ),
         "local_judge_summary": summarize_judge_scores(judge_scores),
         "failure_counts": failure_counts,
         "failures": failures,

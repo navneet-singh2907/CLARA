@@ -350,6 +350,27 @@ def render_evaluation_dashboard() -> None:
     if result["failures"]:
         st.dataframe(pd.DataFrame(result["failures"]), use_container_width=True, hide_index=True)
 
+    render_confidence_calibration(result["risk_confidence_calibration"])
+
+
+def render_confidence_calibration(calibration: dict) -> None:
+    st.subheader("Risk Confidence Calibration")
+    st.metric("Expected calibration error", pct(calibration["expected_calibration_error"]))
+
+    buckets = calibration["buckets"]
+    if not buckets:
+        st.caption("No calibration buckets available.")
+        return
+
+    bucket_table = pd.DataFrame(buckets)
+    st.dataframe(bucket_table, use_container_width=True, hide_index=True)
+    st.line_chart(
+        bucket_table,
+        x="confidence_bucket",
+        y=["average_confidence", "observed_accuracy"],
+        use_container_width=True,
+    )
+
 
 def render_ablation_dashboard() -> None:
     rows = cached_ablation_table()

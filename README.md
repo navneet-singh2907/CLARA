@@ -44,6 +44,7 @@ Evaluation includes:
 - Human override audit log per finding
 - PDF export of the human review packet
 - Ablation visualization that shows each agent's measured contribution
+- Confidence calibration comparing risk confidence to observed accuracy
 
 ## Project Structure
 
@@ -134,8 +135,9 @@ streamlit run loan_pipeline/ui/app.py
 7. Download or save the PDF review packet as the final business artifact.
 8. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
 9. Open `Ablation` to show the contribution chart and prove each agent earns its place.
-10. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
-11. Open `Report` and generate the Markdown evaluation report.
+10. In `Evaluation`, show confidence calibration for the risk scorer.
+11. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
+12. Open `Report` and generate the Markdown evaluation report.
 
 ## Cupcake MVP
 

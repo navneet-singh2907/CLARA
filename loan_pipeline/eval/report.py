@@ -21,6 +21,7 @@ def generate_evaluation_report() -> str:
         _baseline_metrics(eval_result),
         _ablation_table(ablation_rows),
         _failure_analysis(eval_result),
+        _confidence_calibration(eval_result),
         _contradiction_analysis(eval_result),
         _counterfactual_analysis(eval_result),
         _human_override_governance(),
@@ -110,6 +111,32 @@ def _failure_analysis(eval_result: dict[str, Any]) -> str:
     for failure in eval_result["failures"]:
         lines.append(
             f"| {failure['case_id']} | {failure['tier']} | {failure['failure_category']} |"
+        )
+    return "\n".join(lines)
+
+
+def _confidence_calibration(eval_result: dict[str, Any]) -> str:
+    calibration = eval_result["risk_confidence_calibration"]
+    lines = [
+        "## Confidence Calibration",
+        "",
+        "This section compares the Credit Risk Scorer's stated confidence against observed risk-band accuracy on the gold set.",
+        "",
+        f"- Expected calibration error: {_pct(calibration['expected_calibration_error'])}",
+        "",
+        "| Confidence Bucket | Cases | Average Confidence | Observed Accuracy | Gap | Case IDs |",
+        "| --- | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for bucket in calibration["buckets"]:
+        lines.append(
+            "| {bucket} | {cases} | {confidence} | {accuracy} | {gap} | {case_ids} |".format(
+                bucket=bucket["confidence_bucket"],
+                cases=bucket["cases"],
+                confidence=_pct(bucket["average_confidence"]),
+                accuracy=_pct(bucket["observed_accuracy"]),
+                gap=_pct(bucket["calibration_gap"]),
+                case_ids=", ".join(bucket["case_ids"]),
+            )
         )
     return "\n".join(lines)
 

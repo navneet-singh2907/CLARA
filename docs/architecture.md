@@ -68,6 +68,10 @@ The Streamlit interface can export the current review packet as a PDF artifact. 
 
 The dashboard visualizes ablation results from the evaluation harness. It compares full-pipeline accuracy against disabled-agent and single-agent baselines, then summarizes the measured lift from compliance checking, credit risk scoring, and orchestration. This gives the demo a direct answer to why the system is multi-agent rather than a single prompt.
 
+## Confidence Calibration
+
+The evaluation harness measures whether the Credit Risk Scorer's confidence is calibrated against observed gold-set accuracy. The dashboard and report show confidence buckets, observed risk-band accuracy, calibration gaps, and expected calibration error so reviewers can distinguish accurate predictions from merely confident ones.
+
 ## Agent Contract
 
 Each agent receives graph state and returns a partial state update. Agents must not mutate unrelated fields. Outputs should be structured, confidence-scored, and auditable.

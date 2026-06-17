@@ -12,6 +12,7 @@ def test_generate_evaluation_report_contains_required_sections() -> None:
     assert "## Baseline Metrics" in report
     assert "## Ablation Study" in report
     assert "## Failure Analysis" in report
+    assert "## Confidence Calibration" in report
     assert "## Agent Contradiction Analysis" in report
     assert "## Counterfactual Explanation Coverage" in report
     assert "## Human Override Governance" in report
