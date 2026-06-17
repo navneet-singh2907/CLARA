@@ -54,6 +54,8 @@ Human override audit logs are evaluated as a governance control. The demo should
 
 Confidence calibration is evaluated by comparing risk scorer confidence buckets against observed risk-band accuracy and reporting expected calibration error.
 
+Drift detection is evaluated by running each case repeatedly and counting unique output fingerprints.
+
 The local evaluation runner currently reports failure counts by category. The first baseline run is expected to expose calibration misses rather than hide them.
 
 Run:

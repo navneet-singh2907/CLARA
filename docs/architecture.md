@@ -72,6 +72,10 @@ The dashboard visualizes ablation results from the evaluation harness. It compar
 
 The evaluation harness measures whether the Credit Risk Scorer's confidence is calibrated against observed gold-set accuracy. The dashboard and report show confidence buckets, observed risk-band accuracy, calibration gaps, and expected calibration error so reviewers can distinguish accurate predictions from merely confident ones.
 
+## Drift Detection
+
+The evaluation harness can run each case multiple times and fingerprint material review outputs. This detects nondeterministic drift in outcome, compliance, risk, contradictions, counterfactuals, and human-review notes. Deterministic mode should produce a 100% stability rate, while LLM mode can reveal variance that requires prompt, temperature, or orchestration controls.
+
 ## Agent Contract
 
 Each agent receives graph state and returns a partial state update. Agents must not mutate unrelated fields. Outputs should be structured, confidence-scored, and auditable.

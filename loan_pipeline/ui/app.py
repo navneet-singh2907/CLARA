@@ -14,6 +14,7 @@ import streamlit as st
 
 from loan_pipeline.config import get_settings, load_sba_demo_cases
 from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
+from loan_pipeline.eval.drift import run_drift_study
 from loan_pipeline.eval.inter_rater import run_inter_rater_report
 from loan_pipeline.eval.report import REPORT_PATH, generate_evaluation_report, write_evaluation_report
 from loan_pipeline.eval.run_eval import run_eval
@@ -49,6 +50,11 @@ def cached_inter_rater() -> dict:
     return run_inter_rater_report()
 
 
+@st.cache_data(show_spinner=False)
+def cached_drift_study() -> dict:
+    return run_drift_study()
+
+
 def main() -> None:
     settings = get_settings()
 
@@ -60,11 +66,12 @@ def main() -> None:
     st.sidebar.metric("Gold set", "30 cases")
     st.sidebar.metric("Difficulty tiers", "3")
 
-    tab_review, tab_eval, tab_ablation, tab_judges, tab_report = st.tabs(
+    tab_review, tab_eval, tab_ablation, tab_drift, tab_judges, tab_report = st.tabs(
         [
             "Loan Review",
             "Evaluation",
             "Ablation",
+            "Drift",
             "Judge Agreement",
             "Report",
         ]
@@ -78,6 +85,9 @@ def main() -> None:
 
     with tab_ablation:
         render_ablation_dashboard()
+
+    with tab_drift:
+        render_drift_dashboard()
 
     with tab_judges:
         render_judge_dashboard()
@@ -447,6 +457,30 @@ def ablation_chart_data(rows: list[dict]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(chart_rows)
+
+
+def render_drift_dashboard() -> None:
+    result = cached_drift_study()
+
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Cases", result["cases"])
+    metric_cols[1].metric("Runs per case", result["repeats"])
+    metric_cols[2].metric("Stable cases", result["stable_cases"])
+    metric_cols[3].metric("Stability rate", pct(result["stability_rate"]))
+
+    rows = pd.DataFrame(result["rows"])
+    st.subheader("Repeated-Run Drift Results")
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+    tier_summary = (
+        rows.groupby("tier", as_index=False)
+        .agg(cases=("case_id", "count"), stable_cases=("stable", "sum"), max_variants=("variant_count", "max"))
+    )
+    tier_summary["stability_rate"] = tier_summary["stable_cases"] / tier_summary["cases"]
+
+    st.subheader("Drift by Difficulty Tier")
+    st.dataframe(tier_summary, use_container_width=True, hide_index=True)
+    st.bar_chart(tier_summary, x="tier", y="stability_rate", use_container_width=True)
 
 
 def render_judge_dashboard() -> None:

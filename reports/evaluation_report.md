@@ -53,6 +53,24 @@ This section compares the Credit Risk Scorer's stated confidence against observe
 | 0.7-0.8 | 4 | 70.00% | 100.00% | 30.00% | AMB-001, AMB-002, AMB-006, AMB-010 |
 | 0.8-0.9 | 26 | 85.00% | 88.46% | 3.46% | CLEAN-001, CLEAN-002, CLEAN-003, CLEAN-004, CLEAN-005, CLEAN-006, CLEAN-007, CLEAN-008, CLEAN-009, CLEAN-010, AMB-003, AMB-004, AMB-005, AMB-007, AMB-008, AMB-009, ADV-001, ADV-002, ADV-003, ADV-004, ADV-005, ADV-006, ADV-007, ADV-008, ADV-009, ADV-010 |
 
+## Drift Detection
+
+Each gold-set case is run multiple times and material review outputs are fingerprinted to detect nondeterministic drift.
+
+| Metric | Value |
+| --- | ---: |
+| Cases | 30 |
+| Runs per case | 5 |
+| Stable cases | 30 |
+| Drifting cases | 0 |
+| Stability rate | 100.00% |
+
+| Tier | Cases | Stable Cases | Stability Rate | Max Variants |
+| --- | ---: | ---: | ---: | ---: |
+| Clean | 10 | 10 | 100.00% | 1 |
+| Ambiguous | 10 | 10 | 100.00% | 1 |
+| Adversarial | 10 | 10 | 100.00% | 1 |
+
 ## Agent Contradiction Analysis
 
 The orchestrator surfaces conflicts where compliance and credit-risk agents point in different decision directions.

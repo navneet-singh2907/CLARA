@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
+from loan_pipeline.eval.drift import run_drift_study
 from loan_pipeline.eval.inter_rater import run_inter_rater_report
 from loan_pipeline.eval.run_eval import run_eval
 
@@ -13,6 +14,7 @@ REPORT_PATH = Path("reports") / "evaluation_report.md"
 def generate_evaluation_report() -> str:
     eval_result = run_eval()
     ablation_rows = summarize_ablation_table(run_ablation_study())
+    drift_result = run_drift_study()
     inter_rater = run_inter_rater_report()
 
     sections = [
@@ -22,6 +24,7 @@ def generate_evaluation_report() -> str:
         _ablation_table(ablation_rows),
         _failure_analysis(eval_result),
         _confidence_calibration(eval_result),
+        _drift_detection(drift_result),
         _contradiction_analysis(eval_result),
         _counterfactual_analysis(eval_result),
         _human_override_governance(),
@@ -137,6 +140,41 @@ def _confidence_calibration(eval_result: dict[str, Any]) -> str:
                 gap=_pct(bucket["calibration_gap"]),
                 case_ids=", ".join(bucket["case_ids"]),
             )
+        )
+    return "\n".join(lines)
+
+
+def _drift_detection(drift_result: dict[str, Any]) -> str:
+    tier_rows: dict[str, dict[str, int]] = {}
+    for row in drift_result["rows"]:
+        tier = row["tier"]
+        tier_rows.setdefault(tier, {"cases": 0, "stable_cases": 0, "max_variants": 0})
+        tier_rows[tier]["cases"] += 1
+        tier_rows[tier]["stable_cases"] += 1 if row["stable"] else 0
+        tier_rows[tier]["max_variants"] = max(tier_rows[tier]["max_variants"], row["variant_count"])
+
+    lines = [
+        "## Drift Detection",
+        "",
+        "Each gold-set case is run multiple times and material review outputs are fingerprinted to detect nondeterministic drift.",
+        "",
+        "| Metric | Value |",
+        "| --- | ---: |",
+        f"| Cases | {drift_result['cases']} |",
+        f"| Runs per case | {drift_result['repeats']} |",
+        f"| Stable cases | {drift_result['stable_cases']} |",
+        f"| Drifting cases | {drift_result['drifting_cases']} |",
+        f"| Stability rate | {_pct(drift_result['stability_rate'])} |",
+        "",
+        "| Tier | Cases | Stable Cases | Stability Rate | Max Variants |",
+        "| --- | ---: | ---: | ---: | ---: |",
+    ]
+    for tier in ["clean", "ambiguous", "adversarial"]:
+        tier_row = tier_rows.get(tier, {"cases": 0, "stable_cases": 0, "max_variants": 0})
+        stability = tier_row["stable_cases"] / tier_row["cases"] if tier_row["cases"] else 0.0
+        lines.append(
+            f"| {tier.title()} | {tier_row['cases']} | {tier_row['stable_cases']} | "
+            f"{_pct(stability)} | {tier_row['max_variants']} |"
         )
     return "\n".join(lines)
 
