@@ -19,6 +19,8 @@ class Settings:
     use_llm_agents: bool
     openai_api_key: str | None
     openai_model: str
+    langsmith_tracing: bool
+    langsmith_project: str
 
 
 @lru_cache(maxsize=1)
@@ -28,6 +30,9 @@ def get_settings() -> Settings:
         use_llm_agents=_env_bool("USE_LLM_AGENTS", default=False),
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        langsmith_tracing=_env_bool("LANGSMITH_TRACING", default=False)
+        or _env_bool("LANGCHAIN_TRACING_V2", default=False),
+        langsmith_project=os.getenv("LANGSMITH_PROJECT", "loan-review-pipeline"),
     )
 
 

@@ -21,6 +21,10 @@ This design keeps the system modular while preserving an agentic orchestration s
 
 After schema validation, LangGraph fans out to the Compliance Checker and Credit Risk Scorer. These agents consume the same validated extracted terms and write independent state updates before the synthesizer joins their outputs. The graph records an execution trace with `parallel_group="specialist_review"` so the dashboard and report can show the parallel stage explicitly.
 
+## Observability
+
+The pipeline supports optional LangSmith tracing. When `LANGSMITH_TRACING=true`, the top-level loan review run and core agent stages emit LangSmith traces with case ID, stage, and agent tags. This complements the local execution trace shown in Streamlit: LangSmith is for remote LLM/agent observability, while the local trace keeps the demo self-contained when no API key is configured.
+
 ## Core Modules
 
 - `loan_pipeline/agents/`: agent implementations

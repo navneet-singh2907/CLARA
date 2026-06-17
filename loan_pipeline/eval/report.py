@@ -23,6 +23,7 @@ def generate_evaluation_report() -> str:
         "# Small Business Loan Review Pipeline Evaluation Report",
         _executive_summary(eval_result, inter_rater),
         _baseline_metrics(eval_result),
+        _observability(),
         _parallel_execution_trace(),
         _ablation_table(ablation_rows),
         _failure_analysis(eval_result),
@@ -75,6 +76,18 @@ def _baseline_metrics(eval_result: dict[str, Any]) -> str:
     for tier in ["clean", "ambiguous", "adversarial"]:
         lines.append(_metric_row(tier.title(), summary["by_tier"][tier]))
     return "\n".join(lines)
+
+
+def _observability() -> str:
+    return "\n".join(
+        [
+            "## Observability",
+            "",
+            "LangSmith tracing is supported as an optional runtime mode. Set `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT=loan-review-pipeline` to emit traces for the top-level loan review run, Term Extractor, Compliance Checker, Credit Risk Scorer, and Review Synthesizer.",
+            "",
+            "The dashboard also includes a local LangGraph execution trace, so the demo remains inspectable even when LangSmith credentials are not configured.",
+        ]
+    )
 
 
 def _parallel_execution_trace() -> str:

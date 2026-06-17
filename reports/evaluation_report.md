@@ -20,6 +20,12 @@ This report evaluates a LangGraph-based multi-agent small business loan review p
 | Ambiguous | 10 | 100.00% | 100.00% | 100.00% | 100.00% | 100.00% |
 | Adversarial | 10 | 100.00% | 100.00% | 70.00% | 100.00% | 100.00% |
 
+## Observability
+
+LangSmith tracing is supported as an optional runtime mode. Set `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT=loan-review-pipeline` to emit traces for the top-level loan review run, Term Extractor, Compliance Checker, Credit Risk Scorer, and Review Synthesizer.
+
+The dashboard also includes a local LangGraph execution trace, so the demo remains inspectable even when LangSmith credentials are not configured.
+
 ## Parallel Specialist Review Trace
 
 The graph fans out after schema validation so independent specialists can review the same extracted terms before synthesis.
@@ -30,11 +36,11 @@ The graph fans out after schema validation so independent specialists can review
 
 | Node | Stage | Parallel Group | Duration ms | Status |
 | --- | --- | --- | ---: | --- |
-| term_extractor | term_extraction |  | 0.011 | SUCCESS |
+| term_extractor | term_extraction |  | 0.018 | SUCCESS |
 | schema_validator | validation |  | 0.002 | SUCCESS |
-| compliance_checker | parallel_specialist_review | specialist_review | 0.007 | SUCCESS |
-| credit_risk_scorer | parallel_specialist_review | specialist_review | 0.010 | SUCCESS |
-| review_synthesizer | synthesis |  | 0.017 | SUCCESS |
+| compliance_checker | parallel_specialist_review | specialist_review | 0.023 | SUCCESS |
+| credit_risk_scorer | parallel_specialist_review | specialist_review | 0.020 | SUCCESS |
+| review_synthesizer | synthesis |  | 0.019 | SUCCESS |
 
 ## Ablation Study
 

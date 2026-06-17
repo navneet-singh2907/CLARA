@@ -10,6 +10,7 @@ def test_generate_evaluation_report_contains_required_sections() -> None:
 
     assert "# Small Business Loan Review Pipeline Evaluation Report" in report
     assert "## Baseline Metrics" in report
+    assert "## Observability" in report
     assert "## Parallel Specialist Review Trace" in report
     assert "## Ablation Study" in report
     assert "## Failure Analysis" in report

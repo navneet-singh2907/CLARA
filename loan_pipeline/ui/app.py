@@ -63,6 +63,8 @@ def main() -> None:
 
     mode_label = "LLM mode" if settings.use_llm_agents else "Deterministic mode"
     st.sidebar.metric("Agent mode", mode_label)
+    st.sidebar.metric("LangSmith tracing", "On" if settings.langsmith_tracing else "Off")
+    st.sidebar.caption(f"Trace project: {settings.langsmith_project}")
     st.sidebar.metric("Gold set", "30 cases")
     st.sidebar.metric("Difficulty tiers", "3")
 

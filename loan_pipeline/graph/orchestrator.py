@@ -30,6 +30,7 @@ from loan_pipeline.graph.state import (
     initial_state,
     validate_terms_node,
 )
+from loan_pipeline.observability import trace_call
 from loan_pipeline.review.contradictions import detect_contradictions
 from loan_pipeline.review.counterfactuals import generate_counterfactuals
 
@@ -43,6 +44,17 @@ def run_pipeline(loan_case: LoanCase) -> ReviewPacket:
 
 
 def run_pipeline_with_state(loan_case: LoanCase) -> GraphState:
+    return trace_call(
+        name="Loan Review Pipeline",
+        run_type="chain",
+        func=_run_pipeline_with_state,
+        args=(loan_case,),
+        metadata={"case_id": loan_case.case_id, "tier": loan_case.difficulty_tier},
+        tags=["loan-review", "langgraph"],
+    )
+
+
+def _run_pipeline_with_state(loan_case: LoanCase) -> GraphState:
     graph = build_review_graph()
     return graph.invoke(initial_state(loan_case))
 
@@ -70,7 +82,15 @@ def build_review_graph():
 
 def term_extractor_node(state: GraphState) -> GraphState:
     started_at = perf_counter()
-    terms = extract_terms(state["loan_case"])
+    loan_case = state["loan_case"]
+    terms = trace_call(
+        name="Term Extractor Agent",
+        run_type="chain",
+        func=extract_terms,
+        args=(loan_case,),
+        metadata={"case_id": loan_case.case_id, "stage": "term_extraction"},
+        tags=["agent", "term-extractor"],
+    )
     return {
         "extracted_terms": terms,
         "execution_trace": [
@@ -101,7 +121,14 @@ def compliance_checker_node(state: GraphState) -> GraphState:
             ],
         }
     return {
-        "compliance": run_compliance_checker(terms),
+        "compliance": trace_call(
+            name="Compliance Checker Agent",
+            run_type="chain",
+            func=run_compliance_checker,
+            args=(terms,),
+            metadata={"case_id": terms.case_id, "stage": "parallel_specialist_review"},
+            tags=["agent", "compliance", "parallel-specialist-review"],
+        ),
         "execution_trace": [
             _trace_entry(
                 node=COMPLIANCE_CHECKER,
@@ -130,7 +157,14 @@ def credit_risk_scorer_node(state: GraphState) -> GraphState:
             ],
         }
     return {
-        "risk": run_credit_risk_scorer(terms),
+        "risk": trace_call(
+            name="Credit Risk Scorer Agent",
+            run_type="chain",
+            func=run_credit_risk_scorer,
+            args=(terms,),
+            metadata={"case_id": terms.case_id, "stage": "parallel_specialist_review"},
+            tags=["agent", "credit-risk", "parallel-specialist-review"],
+        ),
         "execution_trace": [
             _trace_entry(
                 node=CREDIT_RISK_SCORER,
@@ -173,11 +207,18 @@ def synthesizer_node(state: GraphState) -> GraphState:
             ],
         }
 
-    packet = synthesize_review_packet(
-        terms=terms,
-        compliance=compliance,
-        risk=risk,
-        validation_errors=state["validation_errors"],
+    packet = trace_call(
+        name="Review Synthesizer",
+        run_type="chain",
+        func=synthesize_review_packet,
+        kwargs={
+            "terms": terms,
+            "compliance": compliance,
+            "risk": risk,
+            "validation_errors": state["validation_errors"],
+        },
+        metadata={"case_id": terms.case_id, "stage": "synthesis"},
+        tags=["synthesizer", "review-packet"],
     )
 
     return {

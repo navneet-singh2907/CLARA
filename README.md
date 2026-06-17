@@ -114,6 +114,16 @@ OPENAI_MODEL=gpt-4o-mini
 
 The default deterministic mode keeps evaluation reproducible. Set `USE_LLM_AGENTS=true` with `OPENAI_API_KEY` to enable LangChain-backed agent calls.
 
+Optional LangSmith tracing:
+
+```text
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=your_langsmith_key
+LANGSMITH_PROJECT=loan-review-pipeline
+```
+
+Tracing is optional and off by default. When enabled, the pipeline emits LangSmith traces for the top-level loan review run, Term Extractor, Compliance Checker, Credit Risk Scorer, and Review Synthesizer. Deterministic mode remains reproducible while still giving an observable graph execution record.
+
 Run the app:
 
 ```powershell
