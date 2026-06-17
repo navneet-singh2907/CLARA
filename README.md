@@ -127,6 +127,12 @@ Run the inter-rater agreement scaffold:
 python -m loan_pipeline.eval.inter_rater
 ```
 
+Generate the Markdown evaluation report:
+
+```powershell
+python -m loan_pipeline.eval.report
+```
+
 ## SDLC Status
 
 - Step 1: Problem Statement complete

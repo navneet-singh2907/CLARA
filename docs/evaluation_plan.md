@@ -81,3 +81,17 @@ Run:
 ```powershell
 python -m loan_pipeline.eval.inter_rater
 ```
+
+## Report Artifact
+
+Generate the report:
+
+```powershell
+python -m loan_pipeline.eval.report
+```
+
+Output:
+
+```text
+reports/evaluation_report.md
+```

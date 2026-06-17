@@ -1,0 +1,29 @@
+"""Evaluation report tests."""
+
+from pathlib import Path
+
+from loan_pipeline.eval.report import generate_evaluation_report, write_evaluation_report
+
+
+def test_generate_evaluation_report_contains_required_sections() -> None:
+    report = generate_evaluation_report()
+
+    assert "# Small Business Loan Review Pipeline Evaluation Report" in report
+    assert "## Baseline Metrics" in report
+    assert "## Ablation Study" in report
+    assert "## Failure Analysis" in report
+    assert "## Local Judge Summary" in report
+    assert "## Inter-Rater Agreement" in report
+    assert "## Manual Spot-Check Queue" in report
+    assert "## V2 Recommendations" in report
+
+
+def test_write_evaluation_report_creates_markdown_file(tmp_path: Path) -> None:
+    output_path = tmp_path / "evaluation_report.md"
+
+    written_path = write_evaluation_report(output_path)
+
+    assert written_path == output_path
+    assert output_path.exists()
+    assert "Ablation Study" in output_path.read_text(encoding="utf-8")
+
