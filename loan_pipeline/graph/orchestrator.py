@@ -18,6 +18,8 @@ from loan_pipeline.graph.edges import (
 )
 from loan_pipeline.graph.state import (
     ComplianceResult,
+    ContradictionResult,
+    CounterfactualResult,
     ExtractedTerms,
     GraphState,
     LoanCase,
@@ -26,6 +28,8 @@ from loan_pipeline.graph.state import (
     initial_state,
     validate_terms_node,
 )
+from loan_pipeline.review.contradictions import detect_contradictions
+from loan_pipeline.review.counterfactuals import generate_counterfactuals
 
 
 def run_pipeline(loan_case: LoanCase) -> ReviewPacket:
@@ -101,13 +105,17 @@ def synthesizer_node(state: GraphState) -> GraphState:
             ]
         }
 
+    packet = synthesize_review_packet(
+        terms=terms,
+        compliance=compliance,
+        risk=risk,
+        validation_errors=state["validation_errors"],
+    )
+
     return {
-        "review_packet": synthesize_review_packet(
-            terms=terms,
-            compliance=compliance,
-            risk=risk,
-            validation_errors=state["validation_errors"],
-        )
+        "review_packet": packet,
+        "contradictions": packet.contradictions,
+        "counterfactuals": packet.counterfactuals,
     }
 
 
@@ -118,6 +126,26 @@ def synthesize_review_packet(
     validation_errors: list[str],
 ) -> ReviewPacket:
     human_review_notes: list[str] = []
+    contradictions = [
+        ContradictionResult(
+            severity=contradiction.severity,
+            title=contradiction.title,
+            compliance_position=contradiction.compliance_position,
+            risk_position=contradiction.risk_position,
+            reviewer_prompt=contradiction.reviewer_prompt,
+        )
+        for contradiction in detect_contradictions(compliance, risk)
+    ]
+    counterfactuals = [
+        CounterfactualResult(
+            type=counterfactual.type,
+            title=counterfactual.title,
+            current_state=counterfactual.current_state,
+            suggested_change=counterfactual.suggested_change,
+            expected_effect=counterfactual.expected_effect,
+        )
+        for counterfactual in generate_counterfactuals(terms, compliance, risk)
+    ]
 
     if validation_errors:
         human_review_notes.extend(validation_errors)
@@ -131,9 +159,12 @@ def synthesize_review_packet(
     if terms.confidence < 0.80:
         human_review_notes.append("Extraction confidence is below target threshold.")
 
+    if contradictions:
+        human_review_notes.append("Agent contradiction detected; human adjudication required.")
+
     escalation_required = bool(human_review_notes)
 
-    if validation_errors or compliance.status == "FAIL" or risk.band == "HIGH":
+    if validation_errors or contradictions or compliance.status == "FAIL" or risk.band == "HIGH":
         recommended_outcome = "ESCALATE"
     elif compliance.status == "REVIEW" or risk.band == "MEDIUM":
         recommended_outcome = "CONDITIONAL_REVIEW"
@@ -154,4 +185,6 @@ def synthesize_review_packet(
         compliance=compliance,
         risk=risk,
         human_review_notes=human_review_notes,
+        contradictions=contradictions,
+        counterfactuals=counterfactuals,
     )

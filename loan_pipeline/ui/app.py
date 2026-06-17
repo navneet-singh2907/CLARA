@@ -3,6 +3,7 @@
 from dataclasses import asdict
 from pathlib import Path
 import sys
+from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -18,6 +19,7 @@ from loan_pipeline.eval.report import REPORT_PATH, generate_evaluation_report, w
 from loan_pipeline.eval.run_eval import run_eval
 from loan_pipeline.graph.orchestrator import run_pipeline_with_state
 from loan_pipeline.graph.state import LoanCase
+from loan_pipeline.review.audit import OverrideTarget, create_human_override
 
 
 st.set_page_config(
@@ -91,48 +93,171 @@ def render_loan_review() -> None:
 
     render_case_summary(loan_case)
 
+    review_state_key = f"review_state_{loan_case.case_id}"
     if st.button("Run review pipeline", type="primary"):
-        state = run_pipeline_with_state(loan_case)
-        packet = state["review_packet"]
+        st.session_state[review_state_key] = run_pipeline_with_state(loan_case)
 
-        if packet is None:
-            st.error("Pipeline completed without producing a review packet.")
-            return
+    state = st.session_state.get(review_state_key)
+    if state is None:
+        return
 
-        st.subheader("Human Review Packet")
-        metric_cols = st.columns(4)
-        metric_cols[0].metric("Outcome", packet.recommended_outcome)
-        metric_cols[1].metric("Risk", packet.risk.band)
-        metric_cols[2].metric("Compliance", packet.compliance.status)
-        metric_cols[3].metric("Escalation", "Yes" if packet.escalation_required else "No")
+    packet = state["review_packet"]
 
-        st.write(packet.summary)
+    if packet is None:
+        st.error("Pipeline completed without producing a review packet.")
+        return
 
-        if packet.human_review_notes:
-            st.warning("Human review notes")
-            for note in packet.human_review_notes:
-                st.write(f"- {note}")
+    st.subheader("Human Review Packet")
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Outcome", packet.recommended_outcome)
+    metric_cols[1].metric("Risk", packet.risk.band)
+    metric_cols[2].metric("Compliance", packet.compliance.status)
+    metric_cols[3].metric("Escalation", "Yes" if packet.escalation_required else "No")
 
-        tab_terms, tab_compliance, tab_risk, tab_state = st.tabs(
-            ["Term Extractor", "Compliance Checker", "Credit Risk Scorer", "Graph State"]
+    st.write(packet.summary)
+
+    if packet.human_review_notes:
+        st.warning("Human review notes")
+        for note in packet.human_review_notes:
+            st.write(f"- {note}")
+
+    if packet.contradictions:
+        st.subheader("Agent Contradictions")
+        for contradiction in packet.contradictions:
+            st.error(contradiction.title)
+            cols = st.columns(2)
+            cols[0].write("Compliance position")
+            cols[0].write(contradiction.compliance_position)
+            cols[1].write("Credit risk position")
+            cols[1].write(contradiction.risk_position)
+            st.write(contradiction.reviewer_prompt)
+
+    if packet.counterfactuals:
+        st.subheader("Counterfactual Explanations")
+        for counterfactual in packet.counterfactuals:
+            with st.expander(counterfactual.title, expanded=True):
+                st.write("Current state")
+                st.write(counterfactual.current_state)
+                st.write("Suggested change")
+                st.write(counterfactual.suggested_change)
+                st.write("Expected effect")
+                st.write(counterfactual.expected_effect)
+
+    render_human_override_panel(packet)
+
+    tab_terms, tab_compliance, tab_risk, tab_state = st.tabs(
+        ["Term Extractor", "Compliance Checker", "Credit Risk Scorer", "Graph State"]
+    )
+
+    with tab_terms:
+        st.json(asdict(packet.extracted_terms))
+
+    with tab_compliance:
+        st.json(asdict(packet.compliance))
+
+    with tab_risk:
+        st.json(asdict(packet.risk))
+
+    with tab_state:
+        st.json(
+            {
+                "validation_errors": state["validation_errors"],
+                "agent_errors": state["agent_errors"],
+                "contradictions": [asdict(item) for item in state["contradictions"]],
+                "counterfactuals": [asdict(item) for item in state["counterfactuals"]],
+                "audit_log": st.session_state.get(f"audit_log_{packet.case_id}", []),
+            }
         )
 
-        with tab_terms:
-            st.json(asdict(packet.extracted_terms))
 
-        with tab_compliance:
-            st.json(asdict(packet.compliance))
+def render_human_override_panel(packet) -> None:
+    st.subheader("Human Override Audit Log")
+    targets = override_targets(packet)
+    audit_key = f"audit_log_{packet.case_id}"
+    st.session_state.setdefault(audit_key, [asdict(entry) for entry in packet.audit_log])
 
-        with tab_risk:
-            st.json(asdict(packet.risk))
+    with st.form(f"override_form_{packet.case_id}"):
+        selected_label = st.selectbox("Finding", options=list(targets.keys()))
+        override_decision = st.selectbox(
+            "Decision",
+            options=[
+                "Accept agent finding",
+                "Override finding",
+                "Request additional evidence",
+                "Approve despite finding",
+                "Reject despite finding",
+            ],
+        )
+        reviewer = st.text_input("Reviewer", value="Human reviewer")
+        rationale = st.text_area("Rationale")
+        submitted = st.form_submit_button("Add audit entry")
 
-        with tab_state:
-            st.json(
-                {
-                    "validation_errors": state["validation_errors"],
-                    "agent_errors": state["agent_errors"],
-                }
+    if submitted:
+        if not rationale.strip():
+            st.error("Rationale is required for the audit log.")
+        else:
+            target = targets[selected_label]
+            entry = create_human_override(
+                case_id=packet.case_id,
+                target_type=cast(OverrideTarget, target["target_type"]),
+                target_id=target["target_id"],
+                original_value=target["original_value"],
+                override_decision=override_decision,
+                rationale=rationale,
+                reviewer=reviewer,
             )
+            st.session_state[audit_key].append(asdict(entry))
+            st.success("Audit entry added.")
+
+    audit_log = st.session_state[audit_key]
+    if audit_log:
+        st.dataframe(pd.DataFrame(audit_log), use_container_width=True, hide_index=True)
+    else:
+        st.caption("No human override decisions logged yet.")
+
+
+def override_targets(packet) -> dict[str, dict[str, str]]:
+    targets = {
+        f"Outcome - {packet.recommended_outcome}": {
+            "target_type": "OUTCOME",
+            "target_id": "recommended_outcome",
+            "original_value": packet.recommended_outcome,
+        },
+        f"Risk band - {packet.risk.band}": {
+            "target_type": "RISK",
+            "target_id": "risk_band",
+            "original_value": f"{packet.risk.band}: {packet.risk.rationale}",
+        },
+    }
+
+    for finding in packet.compliance.findings:
+        targets[f"Compliance {finding.rule_id} - {finding.severity}"] = {
+            "target_type": "COMPLIANCE",
+            "target_id": finding.rule_id,
+            "original_value": f"{finding.severity}: {finding.description} Evidence: {finding.evidence}",
+        }
+
+    for index, contradiction in enumerate(packet.contradictions, start=1):
+        targets[f"Contradiction {index} - {contradiction.severity}"] = {
+            "target_type": "CONTRADICTION",
+            "target_id": f"contradiction_{index}",
+            "original_value": (
+                f"{contradiction.title} Compliance: {contradiction.compliance_position} "
+                f"Risk: {contradiction.risk_position}"
+            ),
+        }
+
+    for index, counterfactual in enumerate(packet.counterfactuals, start=1):
+        targets[f"Counterfactual {index} - {counterfactual.title}"] = {
+            "target_type": "COUNTERFACTUAL",
+            "target_id": f"counterfactual_{index}",
+            "original_value": (
+                f"{counterfactual.current_state} Suggested change: "
+                f"{counterfactual.suggested_change}"
+            ),
+        }
+
+    return targets
 
 
 def render_case_summary(loan_case: LoanCase) -> None:

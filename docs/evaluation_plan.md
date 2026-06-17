@@ -46,6 +46,12 @@ python -m loan_pipeline.eval.ablation
 - Orchestration Failure
 - Document Quality Failure
 
+The orchestrator also surfaces agent contradictions separately from failures. A contradiction is not always a wrong answer; it is a signal that independent agents are emphasizing different dimensions of the loan review and require human adjudication.
+
+Counterfactual explanations are reported as a reviewer usability layer. They are most valuable on escalated, failed, ambiguous, and adversarial cases because they convert model findings into concrete remediation paths.
+
+Human override audit logs are evaluated as a governance control. The demo should show that every override is tied to a specific finding, reviewer, decision, rationale, and timestamp.
+
 The local evaluation runner currently reports failure counts by category. The first baseline run is expected to expose calibration misses rather than hide them.
 
 Run:

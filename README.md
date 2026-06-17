@@ -13,7 +13,9 @@ The pipeline uses a hybrid LangGraph DAG:
 3. Compliance Checker Agent evaluates documentation and policy concerns.
 4. Credit Risk Scorer Agent assigns risk band, rationale, and confidence.
 5. Orchestrator resolves contradictions and prepares a human review packet.
-6. Evaluation Harness scores the system against a 30-case gold set.
+6. Counterfactual explainer generates actionable "what would change the outcome" guidance.
+7. Human reviewer can override individual findings with an audit rationale.
+8. Evaluation Harness scores the system against a 30-case gold set.
 
 The current orchestrator is backed by a compiled LangGraph `StateGraph`.
 
@@ -36,6 +38,9 @@ Evaluation includes:
 - Second judge model agreement
 - Manual spot-checking
 - Failure analysis by category
+- Agent contradiction detection for human adjudication
+- Counterfactual explanations for escalated or failed reviews
+- Human override audit log per finding
 
 ## Project Structure
 
@@ -53,6 +58,9 @@ loan_pipeline/
     gold_set.json
     judge.py
     ablation.py
+  review/
+    contradictions.py
+    counterfactuals.py
   ui/
     app.py
   data/
@@ -117,10 +125,13 @@ streamlit run loan_pipeline/ui/app.py
 
 2. In `Loan Review`, select `ADV-003` to show an adversarial case where the current risk scorer misses the gold risk band.
 3. Run the pipeline and show the human review packet, agent outputs, and graph state.
-4. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
-5. Open `Ablation` to show that the full pipeline outperforms disabled-agent and single-agent baselines.
-6. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
-7. Open `Report` and generate the Markdown evaluation report.
+4. Show the `Agent Contradictions` panel when compliance and credit-risk signals conflict.
+5. Show the `Counterfactual Explanations` panel to explain what would make the review outcome improve.
+6. Add a human override with a rationale in the `Human Override Audit Log`.
+7. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
+8. Open `Ablation` to show that the full pipeline outperforms disabled-agent and single-agent baselines.
+9. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
+10. Open `Report` and generate the Markdown evaluation report.
 
 ## Cupcake MVP
 

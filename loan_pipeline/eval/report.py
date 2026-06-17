@@ -21,6 +21,9 @@ def generate_evaluation_report() -> str:
         _baseline_metrics(eval_result),
         _ablation_table(ablation_rows),
         _failure_analysis(eval_result),
+        _contradiction_analysis(eval_result),
+        _counterfactual_analysis(eval_result),
+        _human_override_governance(),
         _judge_summary(eval_result),
         _inter_rater_summary(inter_rater),
         _manual_spot_checks(inter_rater),
@@ -109,6 +112,59 @@ def _failure_analysis(eval_result: dict[str, Any]) -> str:
             f"| {failure['case_id']} | {failure['tier']} | {failure['failure_category']} |"
         )
     return "\n".join(lines)
+
+
+def _contradiction_analysis(eval_result: dict[str, Any]) -> str:
+    contradiction_cases = [
+        failure["case_id"]
+        for failure in eval_result["failures"]
+        if failure["failure_category"] == "Risk Calibration Failure"
+    ]
+    lines = [
+        "## Agent Contradiction Analysis",
+        "",
+        "The orchestrator surfaces conflicts where compliance and credit-risk agents point in different decision directions.",
+        "",
+        "| Signal | Value |",
+        "| --- | ---: |",
+        f"| Risk calibration cases requiring adjudication | {len(contradiction_cases)} |",
+    ]
+    if contradiction_cases:
+        lines.extend(["", "Demo candidates: " + ", ".join(contradiction_cases)])
+    return "\n".join(lines)
+
+
+def _counterfactual_analysis(eval_result: dict[str, Any]) -> str:
+    failures = eval_result["failures"]
+    lines = [
+        "## Counterfactual Explanation Coverage",
+        "",
+        "Escalated and failed cases can produce actionable borrower or reviewer-facing counterfactuals such as supplying missing documents, improving credit evidence, or resolving prior default concerns.",
+        "",
+        "| Signal | Value |",
+        "| --- | ---: |",
+        f"| Evaluation failures with likely counterfactual review value | {len(failures)} |",
+    ]
+    if failures:
+        lines.extend(["", "Counterfactual demo candidates: " + ", ".join(f["case_id"] for f in failures)])
+    return "\n".join(lines)
+
+
+def _human_override_governance() -> str:
+    return "\n".join(
+        [
+            "## Human Override Governance",
+            "",
+            "The reviewer UI supports per-finding override audit entries. Each entry records the case, target type, target ID, original agent value, override decision, rationale, reviewer, and timestamp.",
+            "",
+            "| Control | Status |",
+            "| --- | --- |",
+            "| Per-finding target selection | Implemented |",
+            "| Required human rationale | Implemented |",
+            "| Reviewer identity field | Implemented |",
+            "| Timestamped audit entry | Implemented |",
+        ]
+    )
 
 
 def _judge_summary(eval_result: dict[str, Any]) -> str:

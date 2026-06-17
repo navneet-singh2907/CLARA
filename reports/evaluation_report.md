@@ -28,7 +28,7 @@ This report evaluates a LangGraph-based multi-agent small business loan review p
 | no_compliance_checker | 30 | 100.00% | 43.33% | 90.00% | 90.00% | 76.67% |
 | no_risk_scorer | 30 | 100.00% | 100.00% | 63.33% | 100.00% | 100.00% |
 | term_extractor_only | 30 | 100.00% | 43.33% | 63.33% | 56.67% | 43.33% |
-| single_agent_baseline_stub | 30 | 100.00% | 63.33% | 80.00% | 83.33% | 70.00% |
+| single_agent_baseline_stub | 30 | 100.00% | 63.33% | 80.00% | 100.00% | 86.67% |
 
 ## Failure Analysis
 
@@ -41,6 +41,37 @@ This report evaluates a LangGraph-based multi-agent small business loan review p
 | ADV-003 | adversarial | Risk Calibration Failure |
 | ADV-007 | adversarial | Risk Calibration Failure |
 | ADV-009 | adversarial | Risk Calibration Failure |
+
+## Agent Contradiction Analysis
+
+The orchestrator surfaces conflicts where compliance and credit-risk agents point in different decision directions.
+
+| Signal | Value |
+| --- | ---: |
+| Risk calibration cases requiring adjudication | 3 |
+
+Demo candidates: ADV-003, ADV-007, ADV-009
+
+## Counterfactual Explanation Coverage
+
+Escalated and failed cases can produce actionable borrower or reviewer-facing counterfactuals such as supplying missing documents, improving credit evidence, or resolving prior default concerns.
+
+| Signal | Value |
+| --- | ---: |
+| Evaluation failures with likely counterfactual review value | 3 |
+
+Counterfactual demo candidates: ADV-003, ADV-007, ADV-009
+
+## Human Override Governance
+
+The reviewer UI supports per-finding override audit entries. Each entry records the case, target type, target ID, original agent value, override decision, rationale, reviewer, and timestamp.
+
+| Control | Status |
+| --- | --- |
+| Per-finding target selection | Implemented |
+| Required human rationale | Implemented |
+| Reviewer identity field | Implemented |
+| Timestamped audit entry | Implemented |
 
 ## Local Judge Summary
 

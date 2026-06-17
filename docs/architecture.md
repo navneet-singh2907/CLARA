@@ -48,6 +48,18 @@ LLM mode:
 
 Validation errors force escalation. A loan case cannot receive an approve recommendation when required identifiers, numeric fields, borrower classifications, or financial consistency checks fail.
 
+## Contradiction Detection
+
+The review synthesizer detects conflicts between specialist agents. Examples include compliance blockers paired with low or medium credit risk, high credit risk without compliance findings, and compliance-review requirements paired with low credit risk. These contradictions are surfaced to the human reviewer with both agent positions side by side.
+
+## Counterfactual Explanations
+
+The review layer generates borrower- and reviewer-facing counterfactuals for cases with remediable issues. Instead of stopping at "high risk" or "missing documents," the packet states the current blocker, the specific change needed, and the expected effect on compliance or risk review. Examples include supplying missing documents, providing owner credit evidence, improving a sub-640 credit score, documenting operating history, or resolving a prior default concern.
+
+## Human Override Audit Log
+
+The reviewer interface supports per-finding human override entries. A reviewer can select the final outcome, risk band, compliance finding, contradiction, or counterfactual, choose an override decision, and record a rationale. The audit entry captures the case ID, target type, original agent value, reviewer identity, rationale, and timestamp so the demo can show accountable human-in-the-loop governance.
+
 ## Agent Contract
 
 Each agent receives graph state and returns a partial state update. Agents must not mutate unrelated fields. Outputs should be structured, confidence-scored, and auditable.

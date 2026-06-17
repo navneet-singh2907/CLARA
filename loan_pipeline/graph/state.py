@@ -71,6 +71,37 @@ class RiskResult:
 
 
 @dataclass(frozen=True)
+class ContradictionResult:
+    severity: Literal["LOW", "MEDIUM", "HIGH"]
+    title: str
+    compliance_position: str
+    risk_position: str
+    reviewer_prompt: str
+
+
+@dataclass(frozen=True)
+class CounterfactualResult:
+    type: Literal["DOCUMENTATION", "CREDIT", "OPERATING_HISTORY", "DEFAULT_HISTORY"]
+    title: str
+    current_state: str
+    suggested_change: str
+    expected_effect: str
+
+
+@dataclass(frozen=True)
+class HumanOverride:
+    entry_id: str
+    case_id: str
+    target_type: Literal["COMPLIANCE", "RISK", "CONTRADICTION", "COUNTERFACTUAL", "OUTCOME"]
+    target_id: str
+    original_value: str
+    override_decision: str
+    rationale: str
+    reviewer: str
+    created_at: str
+
+
+@dataclass(frozen=True)
 class ReviewPacket:
     case_id: str
     recommended_outcome: ReviewOutcome
@@ -80,6 +111,9 @@ class ReviewPacket:
     compliance: ComplianceResult
     risk: RiskResult
     human_review_notes: list[str]
+    contradictions: list[ContradictionResult] = field(default_factory=list)
+    counterfactuals: list[CounterfactualResult] = field(default_factory=list)
+    audit_log: list[HumanOverride] = field(default_factory=list)
 
 
 class GraphState(TypedDict):
@@ -88,6 +122,8 @@ class GraphState(TypedDict):
     validation_errors: list[str]
     compliance: ComplianceResult | None
     risk: RiskResult | None
+    contradictions: list[ContradictionResult]
+    counterfactuals: list[CounterfactualResult]
     review_packet: ReviewPacket | None
     agent_errors: list[str]
 
@@ -99,6 +135,8 @@ def initial_state(loan_case: LoanCase) -> GraphState:
         "validation_errors": [],
         "compliance": None,
         "risk": None,
+        "contradictions": [],
+        "counterfactuals": [],
         "review_packet": None,
         "agent_errors": [],
     }
