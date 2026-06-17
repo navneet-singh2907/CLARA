@@ -154,6 +154,7 @@ def render_loan_review() -> None:
                 st.write("Expected effect")
                 st.write(counterfactual.expected_effect)
 
+    render_execution_trace(state["execution_trace"])
     render_human_override_panel(packet)
     render_pdf_export(packet)
 
@@ -178,8 +179,22 @@ def render_loan_review() -> None:
                 "contradictions": [asdict(item) for item in state["contradictions"]],
                 "counterfactuals": [asdict(item) for item in state["counterfactuals"]],
                 "audit_log": st.session_state.get(f"audit_log_{packet.case_id}", []),
+                "execution_trace": [asdict(item) for item in state["execution_trace"]],
             }
         )
+
+
+def render_execution_trace(trace_entries) -> None:
+    st.subheader("LangGraph Execution Trace")
+    trace_table = pd.DataFrame([asdict(entry) for entry in trace_entries])
+    if trace_table.empty:
+        st.caption("No execution trace available.")
+        return
+
+    st.dataframe(trace_table, use_container_width=True, hide_index=True)
+    parallel_nodes = trace_table[trace_table["parallel_group"] == "specialist_review"]
+    if len(parallel_nodes) >= 2:
+        st.success("Compliance Checker and Credit Risk Scorer ran in the parallel specialist review stage.")
 
 
 def render_human_override_panel(packet) -> None:

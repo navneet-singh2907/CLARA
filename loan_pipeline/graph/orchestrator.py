@@ -1,6 +1,7 @@
 """Loan review orchestrator."""
 
 from functools import lru_cache
+from time import perf_counter
 
 from langgraph.graph import END as LANGGRAPH_END
 from langgraph.graph import START as LANGGRAPH_START
@@ -20,6 +21,7 @@ from loan_pipeline.graph.state import (
     ComplianceResult,
     ContradictionResult,
     CounterfactualResult,
+    ExecutionTraceEntry,
     ExtractedTerms,
     GraphState,
     LoanCase,
@@ -67,24 +69,81 @@ def build_review_graph():
 
 
 def term_extractor_node(state: GraphState) -> GraphState:
-    return {"extracted_terms": extract_terms(state["loan_case"])}
+    started_at = perf_counter()
+    terms = extract_terms(state["loan_case"])
+    return {
+        "extracted_terms": terms,
+        "execution_trace": [
+            _trace_entry(
+                node=TERM_EXTRACTOR,
+                stage="term_extraction",
+                parallel_group=None,
+                started_at=started_at,
+            )
+        ],
+    }
 
 
 def compliance_checker_node(state: GraphState) -> GraphState:
+    started_at = perf_counter()
     terms = state["extracted_terms"]
     if terms is None:
-        return {"agent_errors": [*state["agent_errors"], "Compliance checker missing terms."]}
-    return {"compliance": run_compliance_checker(terms)}
+        return {
+            "agent_errors": [*state["agent_errors"], "Compliance checker missing terms."],
+            "execution_trace": [
+                _trace_entry(
+                    node=COMPLIANCE_CHECKER,
+                    stage="parallel_specialist_review",
+                    parallel_group="specialist_review",
+                    started_at=started_at,
+                    status="ERROR",
+                )
+            ],
+        }
+    return {
+        "compliance": run_compliance_checker(terms),
+        "execution_trace": [
+            _trace_entry(
+                node=COMPLIANCE_CHECKER,
+                stage="parallel_specialist_review",
+                parallel_group="specialist_review",
+                started_at=started_at,
+            )
+        ],
+    }
 
 
 def credit_risk_scorer_node(state: GraphState) -> GraphState:
+    started_at = perf_counter()
     terms = state["extracted_terms"]
     if terms is None:
-        return {"agent_errors": [*state["agent_errors"], "Credit risk scorer missing terms."]}
-    return {"risk": run_credit_risk_scorer(terms)}
+        return {
+            "agent_errors": [*state["agent_errors"], "Credit risk scorer missing terms."],
+            "execution_trace": [
+                _trace_entry(
+                    node=CREDIT_RISK_SCORER,
+                    stage="parallel_specialist_review",
+                    parallel_group="specialist_review",
+                    started_at=started_at,
+                    status="ERROR",
+                )
+            ],
+        }
+    return {
+        "risk": run_credit_risk_scorer(terms),
+        "execution_trace": [
+            _trace_entry(
+                node=CREDIT_RISK_SCORER,
+                stage="parallel_specialist_review",
+                parallel_group="specialist_review",
+                started_at=started_at,
+            )
+        ],
+    }
 
 
 def synthesizer_node(state: GraphState) -> GraphState:
+    started_at = perf_counter()
     terms = state["extracted_terms"]
     compliance = state["compliance"]
     risk = state["risk"]
@@ -102,7 +161,16 @@ def synthesizer_node(state: GraphState) -> GraphState:
             "agent_errors": [
                 *state["agent_errors"],
                 f"Synthesizer missing required outputs: {', '.join(missing_outputs)}.",
-            ]
+            ],
+            "execution_trace": [
+                _trace_entry(
+                    node=SYNTHESIZER,
+                    stage="synthesis",
+                    parallel_group=None,
+                    started_at=started_at,
+                    status="ERROR",
+                )
+            ],
         }
 
     packet = synthesize_review_packet(
@@ -116,7 +184,32 @@ def synthesizer_node(state: GraphState) -> GraphState:
         "review_packet": packet,
         "contradictions": packet.contradictions,
         "counterfactuals": packet.counterfactuals,
+        "execution_trace": [
+            _trace_entry(
+                node=SYNTHESIZER,
+                stage="synthesis",
+                parallel_group=None,
+                started_at=started_at,
+            )
+        ],
     }
+
+
+def _trace_entry(
+    *,
+    node: str,
+    stage: str,
+    parallel_group: str | None,
+    started_at: float,
+    status: str = "SUCCESS",
+) -> ExecutionTraceEntry:
+    return ExecutionTraceEntry(
+        node=node,
+        stage=stage,
+        parallel_group=parallel_group,
+        duration_ms=round((perf_counter() - started_at) * 1000, 3),
+        status=status,
+    )
 
 
 def synthesize_review_packet(

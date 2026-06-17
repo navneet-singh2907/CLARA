@@ -8,7 +8,7 @@ Use a hybrid LangGraph DAG implemented with a compiled `StateGraph`:
 Loan Case
   -> Term Extractor
   -> Schema Validator
-  -> Compliance Checker + Credit Risk Scorer
+  -> Compliance Checker + Credit Risk Scorer in parallel
   -> Conflict and Escalation Resolver
   -> Human Review Packet
 ```
@@ -16,6 +16,10 @@ Loan Case
 ## Rationale
 
 This design keeps the system modular while preserving an agentic orchestration story. The Term Extractor creates validated shared state, while the Compliance Checker and Credit Risk Scorer operate independently. The orchestrator owns routing, state transitions, contradiction handling, and escalation logic.
+
+## Parallel Specialist Review
+
+After schema validation, LangGraph fans out to the Compliance Checker and Credit Risk Scorer. These agents consume the same validated extracted terms and write independent state updates before the synthesizer joins their outputs. The graph records an execution trace with `parallel_group="specialist_review"` so the dashboard and report can show the parallel stage explicitly.
 
 ## Core Modules
 

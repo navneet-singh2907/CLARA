@@ -56,6 +56,8 @@ Confidence calibration is evaluated by comparing risk scorer confidence buckets 
 
 Drift detection is evaluated by running each case repeatedly and counting unique output fingerprints.
 
+Parallel specialist execution is evaluated by inspecting the LangGraph execution trace for the shared `specialist_review` parallel group.
+
 The local evaluation runner currently reports failure counts by category. The first baseline run is expected to expose calibration misses rather than hide them.
 
 Run:

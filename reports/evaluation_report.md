@@ -20,6 +20,22 @@ This report evaluates a LangGraph-based multi-agent small business loan review p
 | Ambiguous | 10 | 100.00% | 100.00% | 100.00% | 100.00% | 100.00% |
 | Adversarial | 10 | 100.00% | 100.00% | 70.00% | 100.00% | 100.00% |
 
+## Parallel Specialist Review Trace
+
+The graph fans out after schema validation so independent specialists can review the same extracted terms before synthesis.
+
+- Sample case: CLEAN-001
+- Parallel group: specialist_review
+- Parallel nodes: compliance_checker, credit_risk_scorer
+
+| Node | Stage | Parallel Group | Duration ms | Status |
+| --- | --- | --- | ---: | --- |
+| term_extractor | term_extraction |  | 0.011 | SUCCESS |
+| schema_validator | validation |  | 0.002 | SUCCESS |
+| compliance_checker | parallel_specialist_review | specialist_review | 0.007 | SUCCESS |
+| credit_risk_scorer | parallel_specialist_review | specialist_review | 0.010 | SUCCESS |
+| review_synthesizer | synthesis |  | 0.017 | SUCCESS |
+
 ## Ablation Study
 
 | Configuration | Cases | Extraction | Compliance | Risk | Escalation | Final Outcome |

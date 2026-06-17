@@ -3,10 +3,12 @@
 from pathlib import Path
 from typing import Any
 
+from loan_pipeline.config import load_sba_demo_cases
 from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
 from loan_pipeline.eval.drift import run_drift_study
 from loan_pipeline.eval.inter_rater import run_inter_rater_report
 from loan_pipeline.eval.run_eval import run_eval
+from loan_pipeline.graph.orchestrator import run_pipeline_with_state
 
 REPORT_PATH = Path("reports") / "evaluation_report.md"
 
@@ -21,6 +23,7 @@ def generate_evaluation_report() -> str:
         "# Small Business Loan Review Pipeline Evaluation Report",
         _executive_summary(eval_result, inter_rater),
         _baseline_metrics(eval_result),
+        _parallel_execution_trace(),
         _ablation_table(ablation_rows),
         _failure_analysis(eval_result),
         _confidence_calibration(eval_result),
@@ -71,6 +74,36 @@ def _baseline_metrics(eval_result: dict[str, Any]) -> str:
     ]
     for tier in ["clean", "ambiguous", "adversarial"]:
         lines.append(_metric_row(tier.title(), summary["by_tier"][tier]))
+    return "\n".join(lines)
+
+
+def _parallel_execution_trace() -> str:
+    sample_case = load_sba_demo_cases()[0]
+    state = run_pipeline_with_state(sample_case)
+    trace_rows = state["execution_trace"]
+    parallel_nodes = [
+        entry.node
+        for entry in trace_rows
+        if entry.parallel_group == "specialist_review"
+    ]
+
+    lines = [
+        "## Parallel Specialist Review Trace",
+        "",
+        "The graph fans out after schema validation so independent specialists can review the same extracted terms before synthesis.",
+        "",
+        f"- Sample case: {sample_case.case_id}",
+        f"- Parallel group: specialist_review",
+        f"- Parallel nodes: {', '.join(parallel_nodes)}",
+        "",
+        "| Node | Stage | Parallel Group | Duration ms | Status |",
+        "| --- | --- | --- | ---: | --- |",
+    ]
+    for entry in trace_rows:
+        lines.append(
+            f"| {entry.node} | {entry.stage} | {entry.parallel_group or ''} | "
+            f"{entry.duration_ms:.3f} | {entry.status} |"
+        )
     return "\n".join(lines)
 
 

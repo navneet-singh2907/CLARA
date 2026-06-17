@@ -10,13 +10,14 @@ The pipeline uses a hybrid LangGraph DAG:
 
 1. Term Extractor Agent extracts structured loan-review fields.
 2. Schema Validator checks completeness and state quality.
-3. Compliance Checker Agent evaluates documentation and policy concerns.
-4. Credit Risk Scorer Agent assigns risk band, rationale, and confidence.
-5. Orchestrator resolves contradictions and prepares a human review packet.
-6. Counterfactual explainer generates actionable "what would change the outcome" guidance.
-7. Human reviewer can override individual findings with an audit rationale.
-8. PDF packet exporter creates a portable review artifact for the human decision record.
-9. Evaluation Harness scores the system against a 30-case gold set.
+3. Compliance Checker Agent and Credit Risk Scorer Agent run as parallel specialist reviewers.
+4. Compliance Checker evaluates documentation and policy concerns.
+5. Credit Risk Scorer assigns risk band, rationale, and confidence.
+6. Orchestrator resolves contradictions and prepares a human review packet.
+7. Counterfactual explainer generates actionable "what would change the outcome" guidance.
+8. Human reviewer can override individual findings with an audit rationale.
+9. PDF packet exporter creates a portable review artifact for the human decision record.
+10. Evaluation Harness scores the system against a 30-case gold set.
 
 The current orchestrator is backed by a compiled LangGraph `StateGraph`.
 
@@ -46,6 +47,7 @@ Evaluation includes:
 - Ablation visualization that shows each agent's measured contribution
 - Confidence calibration comparing risk confidence to observed accuracy
 - Drift detection for repeated agent runs
+- LangGraph execution trace showing the parallel specialist review stage
 
 ## Project Structure
 

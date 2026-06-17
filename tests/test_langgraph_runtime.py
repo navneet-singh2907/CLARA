@@ -15,8 +15,11 @@ def test_review_graph_compiles_and_invokes() -> None:
             "validation_errors": [],
             "compliance": None,
             "risk": None,
+            "contradictions": [],
+            "counterfactuals": [],
             "review_packet": None,
             "agent_errors": [],
+            "execution_trace": [],
         }
     )
 
@@ -25,4 +28,11 @@ def test_review_graph_compiles_and_invokes() -> None:
     assert state["risk"] is not None
     assert state["review_packet"] is not None
     assert state["agent_errors"] == []
+
+    parallel_nodes = {
+        entry.node
+        for entry in state["execution_trace"]
+        if entry.parallel_group == "specialist_review"
+    }
+    assert parallel_nodes == {"compliance_checker", "credit_risk_scorer"}
 

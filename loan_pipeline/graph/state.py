@@ -1,7 +1,9 @@
 """Shared graph state and loan review contracts."""
 
+import operator
 from dataclasses import dataclass, field
-from typing import Literal, TypedDict
+from time import perf_counter
+from typing import Annotated, Literal, TypedDict
 
 RiskBand = Literal["LOW", "MEDIUM", "HIGH"]
 ReviewOutcome = Literal["APPROVE", "CONDITIONAL_REVIEW", "ESCALATE", "REJECT"]
@@ -102,6 +104,15 @@ class HumanOverride:
 
 
 @dataclass(frozen=True)
+class ExecutionTraceEntry:
+    node: str
+    stage: str
+    parallel_group: str | None
+    duration_ms: float
+    status: Literal["SUCCESS", "ERROR"]
+
+
+@dataclass(frozen=True)
 class ReviewPacket:
     case_id: str
     recommended_outcome: ReviewOutcome
@@ -126,6 +137,7 @@ class GraphState(TypedDict):
     counterfactuals: list[CounterfactualResult]
     review_packet: ReviewPacket | None
     agent_errors: list[str]
+    execution_trace: Annotated[list[ExecutionTraceEntry], operator.add]
 
 
 def initial_state(loan_case: LoanCase) -> GraphState:
@@ -139,10 +151,12 @@ def initial_state(loan_case: LoanCase) -> GraphState:
         "counterfactuals": [],
         "review_packet": None,
         "agent_errors": [],
+        "execution_trace": [],
     }
 
 
 def validate_terms_node(state: GraphState) -> GraphState:
+    started_at = perf_counter()
     terms = state["extracted_terms"]
     errors: list[str] = []
 
@@ -176,4 +190,15 @@ def validate_terms_node(state: GraphState) -> GraphState:
     if terms.years_in_business is not None and terms.years_in_business < 0:
         errors.append("Years in business cannot be negative.")
 
-    return {"validation_errors": errors}
+    return {
+        "validation_errors": errors,
+        "execution_trace": [
+            ExecutionTraceEntry(
+                node="schema_validator",
+                stage="validation",
+                parallel_group=None,
+                duration_ms=round((perf_counter() - started_at) * 1000, 3),
+                status="SUCCESS" if not errors else "ERROR",
+            )
+        ],
+    }
