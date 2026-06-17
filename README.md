@@ -71,13 +71,14 @@ tests/
 Create and activate a virtual environment:
 
 ```powershell
-python -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
 Install pinned dependencies:
 
 ```powershell
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
