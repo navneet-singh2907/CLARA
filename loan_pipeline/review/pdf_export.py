@@ -20,6 +20,7 @@ from reportlab.platypus import (
 )
 
 from loan_pipeline.graph.state import ReviewPacket
+from loan_pipeline.review.policies import POLICY_PROFILES
 
 
 def build_review_packet_pdf(packet: ReviewPacket, audit_log: list[dict[str, Any]] | None = None) -> bytes:
@@ -38,6 +39,7 @@ def build_review_packet_pdf(packet: ReviewPacket, audit_log: list[dict[str, Any]
     story = [
         Paragraph("Small Business Loan Review Packet", styles["Title"]),
         Paragraph(f"Case ID: {packet.case_id}", styles["Meta"]),
+        Paragraph(f"Reviewer Policy: {POLICY_PROFILES[packet.review_policy].label}", styles["Meta"]),
         Spacer(1, 0.16 * inch),
         _summary_table(packet),
         Spacer(1, 0.18 * inch),

@@ -48,6 +48,7 @@ Evaluation includes:
 - Confidence calibration comparing risk confidence to observed accuracy
 - Drift detection for repeated agent runs
 - LangGraph execution trace showing the parallel specialist review stage
+- Reviewer policy mode: SBA reviewer, bank underwriter, and CDFI lender
 
 ## Project Structure
 
@@ -146,12 +147,13 @@ streamlit run loan_pipeline/ui/app.py
 5. Show the `Counterfactual Explanations` panel to explain what would make the review outcome improve.
 6. Add a human override with a rationale in the `Human Override Audit Log`.
 7. Download or save the PDF review packet as the final business artifact.
-8. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
-9. Open `Ablation` to show the contribution chart and prove each agent earns its place.
-10. In `Evaluation`, show confidence calibration for the risk scorer.
-11. Open `Drift` to show repeated-run stability across the gold set.
-12. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
-13. Open `Report` and generate the Markdown evaluation report.
+8. Use `Compare reviewer policies` to show how SBA, bank, and CDFI review postures differ.
+9. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
+10. Open `Ablation` to show the contribution chart and prove each agent earns its place.
+11. In `Evaluation`, show confidence calibration for the risk scorer.
+12. Open `Drift` to show repeated-run stability across the gold set.
+13. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
+14. Open `Report` and generate the Markdown evaluation report.
 
 ## Cupcake MVP
 

@@ -36,6 +36,7 @@ def run_drift_study(repeats: int = 5, case_ids: Iterable[str] | None = None) -> 
 
 def fingerprint_review_packet(packet: ReviewPacket) -> str:
     payload = {
+        "review_policy": packet.review_policy,
         "extracted_terms": asdict(packet.extracted_terms),
         "recommended_outcome": packet.recommended_outcome,
         "escalation_required": packet.escalation_required,

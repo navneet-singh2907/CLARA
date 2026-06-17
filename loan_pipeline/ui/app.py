@@ -19,9 +19,10 @@ from loan_pipeline.eval.inter_rater import run_inter_rater_report
 from loan_pipeline.eval.report import REPORT_PATH, generate_evaluation_report, write_evaluation_report
 from loan_pipeline.eval.run_eval import run_eval
 from loan_pipeline.graph.orchestrator import run_pipeline_with_state
-from loan_pipeline.graph.state import LoanCase
+from loan_pipeline.graph.state import LoanCase, ReviewPolicy
 from loan_pipeline.review.audit import OverrideTarget, create_human_override
 from loan_pipeline.review.pdf_export import build_review_packet_pdf, write_review_packet_pdf
+from loan_pipeline.review.policies import POLICY_PROFILES
 
 
 st.set_page_config(
@@ -103,12 +104,20 @@ def render_loan_review() -> None:
     case_options = {f"{case.case_id} - {case.borrower_name}": case.case_id for case in cases}
     selected_label = st.selectbox("SBA loan case", options=list(case_options.keys()))
     loan_case = next(case for case in cases if case.case_id == case_options[selected_label])
+    policy_options = {profile.label: policy for policy, profile in POLICY_PROFILES.items()}
+    selected_policy_label = st.selectbox("Reviewer policy", options=list(policy_options.keys()))
+    review_policy = policy_options[selected_policy_label]
 
     render_case_summary(loan_case)
+    render_policy_note(review_policy)
+    render_policy_comparison(loan_case)
 
-    review_state_key = f"review_state_{loan_case.case_id}"
+    review_state_key = f"review_state_{loan_case.case_id}_{review_policy}"
     if st.button("Run review pipeline", type="primary"):
-        st.session_state[review_state_key] = run_pipeline_with_state(loan_case)
+        st.session_state[review_state_key] = run_pipeline_with_state(
+            loan_case,
+            review_policy=review_policy,
+        )
 
     state = st.session_state.get(review_state_key)
     if state is None:
@@ -126,6 +135,7 @@ def render_loan_review() -> None:
     metric_cols[1].metric("Risk", packet.risk.band)
     metric_cols[2].metric("Compliance", packet.compliance.status)
     metric_cols[3].metric("Escalation", "Yes" if packet.escalation_required else "No")
+    st.caption(f"Reviewer policy: {POLICY_PROFILES[packet.review_policy].label}")
 
     st.write(packet.summary)
 
@@ -177,6 +187,7 @@ def render_loan_review() -> None:
         st.json(
             {
                 "validation_errors": state["validation_errors"],
+                "review_policy": state["review_policy"],
                 "agent_errors": state["agent_errors"],
                 "contradictions": [asdict(item) for item in state["contradictions"]],
                 "counterfactuals": [asdict(item) for item in state["counterfactuals"]],
@@ -197,6 +208,31 @@ def render_execution_trace(trace_entries) -> None:
     parallel_nodes = trace_table[trace_table["parallel_group"] == "specialist_review"]
     if len(parallel_nodes) >= 2:
         st.success("Compliance Checker and Credit Risk Scorer ran in the parallel specialist review stage.")
+
+
+def render_policy_note(review_policy: ReviewPolicy) -> None:
+    profile = POLICY_PROFILES[review_policy]
+    st.info(f"{profile.label}: {profile.note}")
+
+
+def render_policy_comparison(loan_case: LoanCase) -> None:
+    with st.expander("Compare reviewer policies"):
+        rows = []
+        for policy, profile in POLICY_PROFILES.items():
+            packet = run_pipeline_with_state(loan_case, review_policy=policy)["review_packet"]
+            if packet is None:
+                continue
+            rows.append(
+                {
+                    "Policy": profile.label,
+                    "Outcome": packet.recommended_outcome,
+                    "Compliance": packet.compliance.status,
+                    "Risk": packet.risk.band,
+                    "Escalation": "Yes" if packet.escalation_required else "No",
+                    "Summary": packet.summary,
+                }
+            )
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
 def render_human_override_panel(packet) -> None:

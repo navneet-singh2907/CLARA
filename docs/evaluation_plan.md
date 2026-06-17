@@ -58,6 +58,8 @@ Drift detection is evaluated by running each case repeatedly and counting unique
 
 Parallel specialist execution is evaluated by inspecting the LangGraph execution trace for the shared `specialist_review` parallel group.
 
+Reviewer policy mode is evaluated by running the same case under SBA reviewer, bank underwriter, and CDFI lender profiles and comparing compliance, risk, escalation, and outcome.
+
 The local evaluation runner currently reports failure counts by category. The first baseline run is expected to expose calibration misses rather than hide them.
 
 Run:

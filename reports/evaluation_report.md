@@ -36,11 +36,11 @@ The graph fans out after schema validation so independent specialists can review
 
 | Node | Stage | Parallel Group | Duration ms | Status |
 | --- | --- | --- | ---: | --- |
-| term_extractor | term_extraction |  | 0.018 | SUCCESS |
+| term_extractor | term_extraction |  | 0.023 | SUCCESS |
 | schema_validator | validation |  | 0.002 | SUCCESS |
-| compliance_checker | parallel_specialist_review | specialist_review | 0.023 | SUCCESS |
-| credit_risk_scorer | parallel_specialist_review | specialist_review | 0.020 | SUCCESS |
-| review_synthesizer | synthesis |  | 0.019 | SUCCESS |
+| compliance_checker | parallel_specialist_review | specialist_review | 0.016 | SUCCESS |
+| credit_risk_scorer | parallel_specialist_review | specialist_review | 0.014 | SUCCESS |
+| review_synthesizer | synthesis |  | 0.020 | SUCCESS |
 
 ## Ablation Study
 
@@ -123,6 +123,18 @@ The reviewer UI supports per-finding override audit entries. Each entry records 
 | Required human rationale | Implemented |
 | Reviewer identity field | Implemented |
 | Timestamped audit entry | Implemented |
+
+## Reviewer Policy Mode
+
+The same loan application can be reviewed under different institutional policy profiles. These profiles are configurable review postures, not official legal rules.
+
+Sample case: AMB-003
+
+| Policy | Outcome | Compliance | Risk | Escalation |
+| --- | --- | --- | --- | --- |
+| SBA Reviewer | APPROVE | PASS | LOW | No |
+| Bank Underwriter | CONDITIONAL_REVIEW | PASS | MEDIUM | No |
+| CDFI Lender | APPROVE | PASS | LOW | No |
 
 ## Local Judge Summary
 

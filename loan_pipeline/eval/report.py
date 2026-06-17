@@ -32,6 +32,7 @@ def generate_evaluation_report() -> str:
         _contradiction_analysis(eval_result),
         _counterfactual_analysis(eval_result),
         _human_override_governance(),
+        _reviewer_policy_mode(),
         _judge_summary(eval_result),
         _inter_rater_summary(inter_rater),
         _manual_spot_checks(inter_rater),
@@ -276,6 +277,31 @@ def _human_override_governance() -> str:
             "| Timestamped audit entry | Implemented |",
         ]
     )
+
+
+def _reviewer_policy_mode() -> str:
+    from loan_pipeline.review.policies import POLICY_PROFILES
+
+    sample_case = next(case for case in load_sba_demo_cases() if case.case_id == "AMB-003")
+    lines = [
+        "## Reviewer Policy Mode",
+        "",
+        "The same loan application can be reviewed under different institutional policy profiles. These profiles are configurable review postures, not official legal rules.",
+        "",
+        f"Sample case: {sample_case.case_id}",
+        "",
+        "| Policy | Outcome | Compliance | Risk | Escalation |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for policy, profile in POLICY_PROFILES.items():
+        packet = run_pipeline_with_state(sample_case, review_policy=policy)["review_packet"]
+        if packet is None:
+            continue
+        lines.append(
+            f"| {profile.label} | {packet.recommended_outcome} | {packet.compliance.status} | "
+            f"{packet.risk.band} | {'Yes' if packet.escalation_required else 'No'} |"
+        )
+    return "\n".join(lines)
 
 
 def _judge_summary(eval_result: dict[str, Any]) -> str:

@@ -1,18 +1,26 @@
 """Credit Risk Scorer Agent."""
 
 from loan_pipeline.config import get_settings
-from loan_pipeline.graph.state import ExtractedTerms, RiskResult
+from loan_pipeline.graph.state import ExtractedTerms, ReviewPolicy, RiskResult
 from loan_pipeline.llm.client import add_llm_risk_rationale
+from loan_pipeline.review.policies import get_policy_profile
 
 
-def run_credit_risk_scorer(terms: ExtractedTerms) -> RiskResult:
-    result = run_credit_risk_scorer_deterministic(terms)
+def run_credit_risk_scorer(
+    terms: ExtractedTerms,
+    review_policy: ReviewPolicy = "sba_reviewer",
+) -> RiskResult:
+    result = run_credit_risk_scorer_deterministic(terms, review_policy=review_policy)
     if get_settings().use_llm_agents:
         return add_llm_risk_rationale(terms, result)
     return result
 
 
-def run_credit_risk_scorer_deterministic(terms: ExtractedTerms) -> RiskResult:
+def run_credit_risk_scorer_deterministic(
+    terms: ExtractedTerms,
+    review_policy: ReviewPolicy = "sba_reviewer",
+) -> RiskResult:
+    profile = get_policy_profile(review_policy)
     points = 1
     primary_risk_factors: list[str] = []
     mitigating_factors: list[str] = []
@@ -46,10 +54,16 @@ def run_credit_risk_scorer_deterministic(terms: ExtractedTerms) -> RiskResult:
     if terms.jobs_supported >= 10:
         mitigating_factors.append("Application supports at least ten jobs.")
 
-    score = min(points, 5)
-    if score >= 4:
+    if profile.mission_impact_credit and terms.jobs_supported >= profile.mission_jobs_threshold:
+        points -= profile.mission_impact_credit
+        mitigating_factors.append(
+            f"{profile.label} policy credits strong mission/job impact."
+        )
+
+    score = min(max(points, 1), 5)
+    if score >= profile.high_risk_min_score:
         band = "HIGH"
-    elif score >= 3:
+    elif score >= profile.medium_risk_min_score:
         band = "MEDIUM"
     else:
         band = "LOW"
@@ -60,7 +74,7 @@ def run_credit_risk_scorer_deterministic(terms: ExtractedTerms) -> RiskResult:
 
     rationale = (
         f"Risk score {score}/5 based on credit profile, operating history, prior default, "
-        "loan size, and job support."
+        f"loan size, job support, and {profile.label} tolerance."
     )
 
     return RiskResult(

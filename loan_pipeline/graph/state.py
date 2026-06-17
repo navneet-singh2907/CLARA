@@ -7,6 +7,7 @@ from typing import Annotated, Literal, TypedDict
 
 RiskBand = Literal["LOW", "MEDIUM", "HIGH"]
 ReviewOutcome = Literal["APPROVE", "CONDITIONAL_REVIEW", "ESCALATE", "REJECT"]
+ReviewPolicy = Literal["sba_reviewer", "bank_underwriter", "cdfi_lender"]
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,7 @@ class ExecutionTraceEntry:
 @dataclass(frozen=True)
 class ReviewPacket:
     case_id: str
+    review_policy: ReviewPolicy
     recommended_outcome: ReviewOutcome
     escalation_required: bool
     summary: str
@@ -129,6 +131,7 @@ class ReviewPacket:
 
 class GraphState(TypedDict):
     loan_case: LoanCase
+    review_policy: ReviewPolicy
     extracted_terms: ExtractedTerms | None
     validation_errors: list[str]
     compliance: ComplianceResult | None
@@ -140,9 +143,10 @@ class GraphState(TypedDict):
     execution_trace: Annotated[list[ExecutionTraceEntry], operator.add]
 
 
-def initial_state(loan_case: LoanCase) -> GraphState:
+def initial_state(loan_case: LoanCase, review_policy: ReviewPolicy = "sba_reviewer") -> GraphState:
     return {
         "loan_case": loan_case,
+        "review_policy": review_policy,
         "extracted_terms": None,
         "validation_errors": [],
         "compliance": None,

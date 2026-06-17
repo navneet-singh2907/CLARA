@@ -19,6 +19,7 @@ def test_generate_evaluation_report_contains_required_sections() -> None:
     assert "## Agent Contradiction Analysis" in report
     assert "## Counterfactual Explanation Coverage" in report
     assert "## Human Override Governance" in report
+    assert "## Reviewer Policy Mode" in report
     assert "## Local Judge Summary" in report
     assert "## Inter-Rater Agreement" in report
     assert "## Manual Spot-Check Queue" in report

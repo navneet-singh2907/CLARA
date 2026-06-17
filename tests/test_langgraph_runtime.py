@@ -11,6 +11,7 @@ def test_review_graph_compiles_and_invokes() -> None:
     state = graph.invoke(
         {
             "loan_case": case,
+            "review_policy": "sba_reviewer",
             "extracted_terms": None,
             "validation_errors": [],
             "compliance": None,

@@ -72,6 +72,10 @@ The reviewer interface supports per-finding human override entries. A reviewer c
 
 The Streamlit interface can export the current review packet as a PDF artifact. The packet includes the recommended outcome, extracted terms, compliance findings, credit risk rationale, contradictions, counterfactual explanations, and human override audit log. This turns the agent run into a portable business record that a reviewer could attach to a loan file.
 
+## Reviewer Policy Mode
+
+The pipeline supports configurable institutional review postures: SBA Reviewer, Bank Underwriter, and CDFI Lender. These are policy profiles for demonstration and decision-support configuration, not official legal rules. Each profile adjusts risk tolerance, guarantee-ratio review thresholds, prior-default severity, and mission-impact treatment so the same loan can produce different review outputs under different institutional contexts.
+
 ## Ablation Evidence View
 
 The dashboard visualizes ablation results from the evaluation harness. It compares full-pipeline accuracy against disabled-agent and single-agent baselines, then summarizes the measured lift from compliance checking, credit risk scoring, and orchestration. This gives the demo a direct answer to why the system is multi-agent rather than a single prompt.

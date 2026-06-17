@@ -26,6 +26,7 @@ from loan_pipeline.graph.state import (
     GraphState,
     LoanCase,
     ReviewPacket,
+    ReviewPolicy,
     RiskResult,
     initial_state,
     validate_terms_node,
@@ -35,28 +36,35 @@ from loan_pipeline.review.contradictions import detect_contradictions
 from loan_pipeline.review.counterfactuals import generate_counterfactuals
 
 
-def run_pipeline(loan_case: LoanCase) -> ReviewPacket:
-    state = run_pipeline_with_state(loan_case)
+def run_pipeline(loan_case: LoanCase, review_policy: ReviewPolicy = "sba_reviewer") -> ReviewPacket:
+    state = run_pipeline_with_state(loan_case, review_policy=review_policy)
     packet = state["review_packet"]
     if packet is None:
         raise RuntimeError("Pipeline completed without producing a review packet.")
     return packet
 
 
-def run_pipeline_with_state(loan_case: LoanCase) -> GraphState:
+def run_pipeline_with_state(
+    loan_case: LoanCase,
+    review_policy: ReviewPolicy = "sba_reviewer",
+) -> GraphState:
     return trace_call(
         name="Loan Review Pipeline",
         run_type="chain",
         func=_run_pipeline_with_state,
-        args=(loan_case,),
-        metadata={"case_id": loan_case.case_id, "tier": loan_case.difficulty_tier},
+        args=(loan_case, review_policy),
+        metadata={
+            "case_id": loan_case.case_id,
+            "tier": loan_case.difficulty_tier,
+            "review_policy": review_policy,
+        },
         tags=["loan-review", "langgraph"],
     )
 
 
-def _run_pipeline_with_state(loan_case: LoanCase) -> GraphState:
+def _run_pipeline_with_state(loan_case: LoanCase, review_policy: ReviewPolicy) -> GraphState:
     graph = build_review_graph()
-    return graph.invoke(initial_state(loan_case))
+    return graph.invoke(initial_state(loan_case, review_policy=review_policy))
 
 
 @lru_cache(maxsize=1)
@@ -107,6 +115,7 @@ def term_extractor_node(state: GraphState) -> GraphState:
 def compliance_checker_node(state: GraphState) -> GraphState:
     started_at = perf_counter()
     terms = state["extracted_terms"]
+    review_policy = state["review_policy"]
     if terms is None:
         return {
             "agent_errors": [*state["agent_errors"], "Compliance checker missing terms."],
@@ -125,8 +134,12 @@ def compliance_checker_node(state: GraphState) -> GraphState:
             name="Compliance Checker Agent",
             run_type="chain",
             func=run_compliance_checker,
-            args=(terms,),
-            metadata={"case_id": terms.case_id, "stage": "parallel_specialist_review"},
+            args=(terms, review_policy),
+            metadata={
+                "case_id": terms.case_id,
+                "stage": "parallel_specialist_review",
+                "review_policy": review_policy,
+            },
             tags=["agent", "compliance", "parallel-specialist-review"],
         ),
         "execution_trace": [
@@ -143,6 +156,7 @@ def compliance_checker_node(state: GraphState) -> GraphState:
 def credit_risk_scorer_node(state: GraphState) -> GraphState:
     started_at = perf_counter()
     terms = state["extracted_terms"]
+    review_policy = state["review_policy"]
     if terms is None:
         return {
             "agent_errors": [*state["agent_errors"], "Credit risk scorer missing terms."],
@@ -161,8 +175,12 @@ def credit_risk_scorer_node(state: GraphState) -> GraphState:
             name="Credit Risk Scorer Agent",
             run_type="chain",
             func=run_credit_risk_scorer,
-            args=(terms,),
-            metadata={"case_id": terms.case_id, "stage": "parallel_specialist_review"},
+            args=(terms, review_policy),
+            metadata={
+                "case_id": terms.case_id,
+                "stage": "parallel_specialist_review",
+                "review_policy": review_policy,
+            },
             tags=["agent", "credit-risk", "parallel-specialist-review"],
         ),
         "execution_trace": [
@@ -181,6 +199,7 @@ def synthesizer_node(state: GraphState) -> GraphState:
     terms = state["extracted_terms"]
     compliance = state["compliance"]
     risk = state["risk"]
+    review_policy = state["review_policy"]
 
     missing_outputs = []
     if terms is None:
@@ -216,8 +235,9 @@ def synthesizer_node(state: GraphState) -> GraphState:
             "compliance": compliance,
             "risk": risk,
             "validation_errors": state["validation_errors"],
+            "review_policy": review_policy,
         },
-        metadata={"case_id": terms.case_id, "stage": "synthesis"},
+        metadata={"case_id": terms.case_id, "stage": "synthesis", "review_policy": review_policy},
         tags=["synthesizer", "review-packet"],
     )
 
@@ -258,6 +278,7 @@ def synthesize_review_packet(
     compliance: ComplianceResult,
     risk: RiskResult,
     validation_errors: list[str],
+    review_policy: ReviewPolicy = "sba_reviewer",
 ) -> ReviewPacket:
     human_review_notes: list[str] = []
     contradictions = [
@@ -312,6 +333,7 @@ def synthesize_review_packet(
 
     return ReviewPacket(
         case_id=terms.case_id,
+        review_policy=review_policy,
         recommended_outcome=recommended_outcome,
         escalation_required=escalation_required,
         summary=summary,
