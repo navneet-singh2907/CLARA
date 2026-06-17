@@ -20,6 +20,7 @@ from loan_pipeline.eval.run_eval import run_eval
 from loan_pipeline.graph.orchestrator import run_pipeline_with_state
 from loan_pipeline.graph.state import LoanCase
 from loan_pipeline.review.audit import OverrideTarget, create_human_override
+from loan_pipeline.review.pdf_export import build_review_packet_pdf, write_review_packet_pdf
 
 
 st.set_page_config(
@@ -144,6 +145,7 @@ def render_loan_review() -> None:
                 st.write(counterfactual.expected_effect)
 
     render_human_override_panel(packet)
+    render_pdf_export(packet)
 
     tab_terms, tab_compliance, tab_risk, tab_state = st.tabs(
         ["Term Extractor", "Compliance Checker", "Credit Risk Scorer", "Graph State"]
@@ -214,6 +216,26 @@ def render_human_override_panel(packet) -> None:
         st.dataframe(pd.DataFrame(audit_log), use_container_width=True, hide_index=True)
     else:
         st.caption("No human override decisions logged yet.")
+
+
+def render_pdf_export(packet) -> None:
+    st.subheader("Review Packet Export")
+    audit_log = st.session_state.get(f"audit_log_{packet.case_id}", [])
+    pdf_bytes = build_review_packet_pdf(packet, audit_log=audit_log)
+    file_name = f"loan_review_packet_{packet.case_id}.pdf"
+
+    cols = st.columns([1, 1])
+    cols[0].download_button(
+        "Download PDF packet",
+        data=pdf_bytes,
+        file_name=file_name,
+        mime="application/pdf",
+    )
+
+    if cols[1].button("Save PDF artifact"):
+        output_path = Path("output") / "pdf" / file_name
+        write_review_packet_pdf(packet, output_path, audit_log=audit_log)
+        st.success(f"Saved {output_path}")
 
 
 def override_targets(packet) -> dict[str, dict[str, str]]:

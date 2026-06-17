@@ -15,7 +15,8 @@ The pipeline uses a hybrid LangGraph DAG:
 5. Orchestrator resolves contradictions and prepares a human review packet.
 6. Counterfactual explainer generates actionable "what would change the outcome" guidance.
 7. Human reviewer can override individual findings with an audit rationale.
-8. Evaluation Harness scores the system against a 30-case gold set.
+8. PDF packet exporter creates a portable review artifact for the human decision record.
+9. Evaluation Harness scores the system against a 30-case gold set.
 
 The current orchestrator is backed by a compiled LangGraph `StateGraph`.
 
@@ -41,6 +42,7 @@ Evaluation includes:
 - Agent contradiction detection for human adjudication
 - Counterfactual explanations for escalated or failed reviews
 - Human override audit log per finding
+- PDF export of the human review packet
 
 ## Project Structure
 
@@ -128,10 +130,11 @@ streamlit run loan_pipeline/ui/app.py
 4. Show the `Agent Contradictions` panel when compliance and credit-risk signals conflict.
 5. Show the `Counterfactual Explanations` panel to explain what would make the review outcome improve.
 6. Add a human override with a rationale in the `Human Override Audit Log`.
-7. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
-8. Open `Ablation` to show that the full pipeline outperforms disabled-agent and single-agent baselines.
-9. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
-10. Open `Report` and generate the Markdown evaluation report.
+7. Download or save the PDF review packet as the final business artifact.
+8. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
+9. Open `Ablation` to show that the full pipeline outperforms disabled-agent and single-agent baselines.
+10. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
+11. Open `Report` and generate the Markdown evaluation report.
 
 ## Cupcake MVP
 

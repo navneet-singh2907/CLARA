@@ -60,6 +60,10 @@ The review layer generates borrower- and reviewer-facing counterfactuals for cas
 
 The reviewer interface supports per-finding human override entries. A reviewer can select the final outcome, risk band, compliance finding, contradiction, or counterfactual, choose an override decision, and record a rationale. The audit entry captures the case ID, target type, original agent value, reviewer identity, rationale, and timestamp so the demo can show accountable human-in-the-loop governance.
 
+## PDF Review Packet Export
+
+The Streamlit interface can export the current review packet as a PDF artifact. The packet includes the recommended outcome, extracted terms, compliance findings, credit risk rationale, contradictions, counterfactual explanations, and human override audit log. This turns the agent run into a portable business record that a reviewer could attach to a loan file.
+
 ## Agent Contract
 
 Each agent receives graph state and returns a partial state update. Agents must not mutate unrelated fields. Outputs should be structured, confidence-scored, and auditable.
