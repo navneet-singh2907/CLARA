@@ -27,6 +27,22 @@ Loan review decisions can affect whether a small business receives capital, surv
 - 30-case gold-set evaluation with clean, ambiguous, and adversarial tiers
 - Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, drift detection, and confidence calibration
 
+## Results Snapshot
+
+Current deterministic evaluation results:
+
+| Metric | Result |
+| --- | ---: |
+| Gold set size | 30 cases |
+| Difficulty tiers | 10 clean / 10 ambiguous / 10 adversarial |
+| Final outcome accuracy | 100.00% |
+| Risk band accuracy | 90.00% |
+| Drift stability | 100.00% across 5 runs per case |
+| Risk confidence expected calibration error | 7.00% |
+| Test suite | 52 passing tests |
+
+The three known risk-band misses are retained as honest adversarial calibration findings rather than tuned away.
+
 ## Architecture Diagram
 
 ```mermaid
@@ -236,6 +252,13 @@ Generate the Markdown evaluation report:
 ```powershell
 python -m loan_pipeline.eval.report
 ```
+
+## Limitations And Next Steps
+
+- Default mode uses deterministic agent internals for reproducible evaluation; optional LLM mode is available through `USE_LLM_AGENTS=true`.
+- Reviewer policy modes are configurable institutional postures, not official legal determinations.
+- The included 30-case gold set is SBA-style seed data; the public SBA FOIA loader is scaffolded for larger hand-adjudicated datasets.
+- Next production steps would be FastAPI service packaging, durable checkpointing for long-running human review, and richer document parsing for scanned loan packets.
 
 Normalize a downloaded SBA FOIA CSV in code:
 

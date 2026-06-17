@@ -74,7 +74,34 @@ Say:
 
 > The Term Extractor and Validator run first. After validation, LangGraph fans out into parallel specialist review: Compliance Checker and Credit Risk Scorer. Their outputs join at the Review Synthesizer.
 
-### 4. Show Counterfactuals
+### 4. Show A Contradiction Case
+
+Select:
+
+```text
+AMB-002
+```
+
+Run the pipeline.
+
+Show:
+
+- Agent Contradictions
+- Compliance position
+- Credit risk position
+- Human adjudication prompt
+
+Say:
+
+> The system does not hide disagreement between agents. It surfaces the conflict for human adjudication with both rationales side by side.
+
+### 5. Show Counterfactuals
+
+Return to:
+
+```text
+ADV-001
+```
 
 Scroll to `Counterfactual Explanations`.
 
@@ -88,7 +115,7 @@ Say:
 
 > This turns a rejection or escalation into actionable feedback.
 
-### 5. Show Human Override Audit Log
+### 6. Show Human Override Audit Log
 
 Add an audit entry:
 
@@ -103,7 +130,7 @@ Say:
 
 > The human can override or adjudicate an agent finding, but the rationale is logged against a specific target.
 
-### 6. Export The PDF Packet
+### 7. Export The PDF Packet
 
 Click:
 
@@ -115,7 +142,7 @@ Say:
 
 > The agent run becomes a portable review artifact that can be attached to a loan file.
 
-### 7. Show Evaluation
+### 8. Show Evaluation
 
 Open `Evaluation`.
 
@@ -130,7 +157,7 @@ Say:
 
 > The project is evaluated by difficulty tier, not just overall accuracy.
 
-### 8. Show Ablation
+### 9. Show Ablation
 
 Open `Ablation`.
 
@@ -145,7 +172,7 @@ Say:
 
 > This proves each agent earns its place.
 
-### 9. Show Drift
+### 10. Show Drift
 
 Open `Drift`.
 
@@ -161,7 +188,7 @@ Say:
 
 > This harness is ready to detect nondeterministic drift when LLM mode is enabled.
 
-### 10. Show Judge Agreement
+### 11. Show Judge Agreement
 
 Open `Judge Agreement`.
 
