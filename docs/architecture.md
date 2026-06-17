@@ -51,3 +51,7 @@ Validation errors force escalation. A loan case cannot receive an approve recomm
 ## Agent Contract
 
 Each agent receives graph state and returns a partial state update. Agents must not mutate unrelated fields. Outputs should be structured, confidence-scored, and auditable.
+
+## Demo Surface
+
+The Streamlit dashboard is the reviewer-facing surface. It exposes the loan review workflow, evaluation dashboard, ablation study, judge agreement report, and generated Markdown evaluation artifact from one place.

@@ -95,3 +95,7 @@ Output:
 ```text
 reports/evaluation_report.md
 ```
+
+## Demo Path
+
+Use `ADV-003`, `ADV-007`, or `ADV-009` during demos to show the documented risk calibration failures. These cases are intentionally retained as honest evaluation findings rather than tuned away.

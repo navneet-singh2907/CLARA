@@ -96,13 +96,28 @@ OPENAI_MODEL=gpt-4o-mini
 
 The default deterministic mode keeps evaluation reproducible. Set `USE_LLM_AGENTS=true` with `OPENAI_API_KEY` to enable LangChain-backed agent calls.
 
-Run the app once implemented:
+Run the app:
 
 ```powershell
 streamlit run loan_pipeline/ui/app.py
 ```
 
 The dashboard includes loan review, evaluation metrics, ablation results, judge agreement, and report preview tabs.
+
+## Demo Script
+
+1. Open the dashboard:
+
+```powershell
+streamlit run loan_pipeline/ui/app.py
+```
+
+2. In `Loan Review`, select `ADV-003` to show an adversarial case where the current risk scorer misses the gold risk band.
+3. Run the pipeline and show the human review packet, agent outputs, and graph state.
+4. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
+5. Open `Ablation` to show that the full pipeline outperforms disabled-agent and single-agent baselines.
+6. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
+7. Open `Report` and generate the Markdown evaluation report.
 
 ## Cupcake MVP
 
@@ -152,4 +167,5 @@ python -m loan_pipeline.eval.report
 - Step 4: Cupcake MVP complete
 - Step 5: Peer Review Iteration complete
 - Step 6: Edge-Case Stress Testing complete
-- Step 7: Ship Early Demo in progress
+- Step 7: Ship Early Demo complete
+- Step 8: Iteration Flywheel in progress
