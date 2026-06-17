@@ -43,6 +43,7 @@ Evaluation includes:
 - Counterfactual explanations for escalated or failed reviews
 - Human override audit log per finding
 - PDF export of the human review packet
+- Ablation visualization that shows each agent's measured contribution
 
 ## Project Structure
 
@@ -132,7 +133,7 @@ streamlit run loan_pipeline/ui/app.py
 6. Add a human override with a rationale in the `Human Override Audit Log`.
 7. Download or save the PDF review packet as the final business artifact.
 8. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
-9. Open `Ablation` to show that the full pipeline outperforms disabled-agent and single-agent baselines.
+9. Open `Ablation` to show the contribution chart and prove each agent earns its place.
 10. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
 11. Open `Report` and generate the Markdown evaluation report.
 

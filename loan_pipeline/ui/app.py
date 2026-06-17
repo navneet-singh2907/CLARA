@@ -353,12 +353,79 @@ def render_evaluation_dashboard() -> None:
 
 def render_ablation_dashboard() -> None:
     rows = cached_ablation_table()
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    table = pd.DataFrame(rows)
+    st.dataframe(table, use_container_width=True, hide_index=True)
 
     full = next(row for row in rows if row["configuration"] == "full_pipeline")
     baseline = next(row for row in rows if row["configuration"] == "single_agent_baseline_stub")
+    no_compliance = next(row for row in rows if row["configuration"] == "no_compliance_checker")
+    no_risk = next(row for row in rows if row["configuration"] == "no_risk_scorer")
+    term_only = next(row for row in rows if row["configuration"] == "term_extractor_only")
+
     delta = full["final_outcome_accuracy"] - baseline["final_outcome_accuracy"]
-    st.metric("Full pipeline vs single-agent outcome lift", pct(delta))
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Full vs single-agent outcome lift", pct(delta))
+    metric_cols[1].metric(
+        "Compliance agent lift",
+        pct(full["compliance_status_accuracy"] - no_compliance["compliance_status_accuracy"]),
+    )
+    metric_cols[2].metric(
+        "Risk scorer lift",
+        pct(full["risk_band_accuracy"] - no_risk["risk_band_accuracy"]),
+    )
+    metric_cols[3].metric(
+        "Pipeline vs extractor-only lift",
+        pct(full["final_outcome_accuracy"] - term_only["final_outcome_accuracy"]),
+    )
+
+    st.subheader("Ablation Accuracy Comparison")
+    chart_data = ablation_chart_data(rows)
+    st.bar_chart(
+        chart_data,
+        x="Configuration",
+        y=["Extraction", "Compliance", "Risk", "Escalation", "Final Outcome"],
+        use_container_width=True,
+    )
+
+    st.subheader("Agent Contribution Readout")
+    contribution_rows = [
+        {
+            "Question": "What breaks when compliance is removed?",
+            "Answer": f"Compliance accuracy drops by {pct(full['compliance_status_accuracy'] - no_compliance['compliance_status_accuracy'])}.",
+        },
+        {
+            "Question": "What breaks when risk scoring is removed?",
+            "Answer": f"Risk band accuracy drops by {pct(full['risk_band_accuracy'] - no_risk['risk_band_accuracy'])}.",
+        },
+        {
+            "Question": "Does orchestration beat extraction alone?",
+            "Answer": f"Final outcome accuracy improves by {pct(full['final_outcome_accuracy'] - term_only['final_outcome_accuracy'])}.",
+        },
+    ]
+    st.dataframe(pd.DataFrame(contribution_rows), use_container_width=True, hide_index=True)
+
+
+def ablation_chart_data(rows: list[dict]) -> pd.DataFrame:
+    labels = {
+        "full_pipeline": "Full Pipeline",
+        "no_compliance_checker": "No Compliance",
+        "no_risk_scorer": "No Risk",
+        "term_extractor_only": "Extractor Only",
+        "single_agent_baseline_stub": "Single Agent",
+    }
+    chart_rows = []
+    for row in rows:
+        chart_rows.append(
+            {
+                "Configuration": labels.get(row["configuration"], row["configuration"]),
+                "Extraction": row["term_extraction_accuracy"],
+                "Compliance": row["compliance_status_accuracy"],
+                "Risk": row["risk_band_accuracy"],
+                "Escalation": row["escalation_accuracy"],
+                "Final Outcome": row["final_outcome_accuracy"],
+            }
+        )
+    return pd.DataFrame(chart_rows)
 
 
 def render_judge_dashboard() -> None:
