@@ -8,6 +8,8 @@ The project will use a 30-case gold set:
 - 10 ambiguous cases
 - 10 adversarial cases
 
+The gold set is intentionally stable. Public SBA FOIA imports should be treated as candidate records and manually adjudicated before replacing or extending the gold labels.
+
 ## Metrics
 
 - Term extraction accuracy

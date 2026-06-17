@@ -57,9 +57,11 @@ loan_pipeline/
     app.py
   data/
     sba_loans.csv
+    load_sba_public.py
   config.py
 docs/
   architecture.md
+  data_source.md
   evaluation_plan.md
 requirements.txt
 README.md
@@ -158,6 +160,15 @@ Generate the Markdown evaluation report:
 
 ```powershell
 python -m loan_pipeline.eval.report
+```
+
+Normalize a downloaded SBA FOIA CSV in code:
+
+```python
+from pathlib import Path
+from loan_pipeline.data.load_sba_public import load_sba_public_cases
+
+cases = load_sba_public_cases(Path("loan_pipeline/data/foia_7a_2020_present.downloaded.csv"))
 ```
 
 ## SDLC Status

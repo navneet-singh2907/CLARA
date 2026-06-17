@@ -23,7 +23,7 @@ This design keeps the system modular while preserving an agentic orchestration s
 - `loan_pipeline/graph/`: graph state, orchestration, and edge topology
 - `loan_pipeline/eval/`: gold-set evaluation, ablation, judge scoring, and failure analysis
 - `loan_pipeline/ui/`: Streamlit reviewer interface
-- `loan_pipeline/data/`: SBA loan data
+- `loan_pipeline/data/`: curated 30-case working set and SBA FOIA normalization helpers
 - `loan_pipeline/config.py`: local configuration and data loading helpers
 
 ## Cupcake MVP Implementation
