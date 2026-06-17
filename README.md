@@ -2,7 +2,51 @@
 
 Week 3 project for the Gen Academy Agentic AI Bootcamp.
 
-This project builds a multi-agent loan application review pipeline using LangChain, LangGraph, and Streamlit. The system assists a human loan reviewer by extracting loan terms, checking compliance concerns, scoring credit risk, and producing an auditable review packet.
+LangChain + LangGraph + Streamlit system for reviewing small business loan applications with specialist agents, human-in-the-loop audit controls, rigorous evaluation, and exportable review packets.
+
+## Portfolio Summary
+
+This project treats agentic AI as a high-stakes financial decision-support workflow rather than a simple automation demo. A LangGraph orchestrator coordinates specialist agents for term extraction, compliance review, and credit risk scoring. The system then surfaces contradictions, generates counterfactual explanations, supports reviewer policy modes, logs human overrides, exports a PDF review packet, and evaluates performance against a structured 30-case gold set.
+
+Default mode is deterministic so evaluation is reproducible. Optional LangChain-backed LLM mode and LangSmith tracing can be enabled through environment configuration.
+
+## Why It Matters
+
+Loan review decisions can affect whether a small business receives capital, survives a cash crunch, or expands hiring. That makes correctness, explainability, and auditability central engineering requirements. This project emphasizes evaluation and governance: ablations, judge agreement, confidence calibration, drift detection, contradiction handling, counterfactuals, and human override logs.
+
+## Highlights
+
+- LangGraph fan-out/fan-in orchestration with parallel specialist review
+- Agents for term extraction, compliance checking, and credit risk scoring
+- Reviewer policy mode for SBA reviewer, bank underwriter, and CDFI lender postures
+- Contradiction detection between compliance and credit-risk outputs
+- Counterfactual explanations for remediable loan review issues
+- Human override audit log per finding
+- PDF export of the review packet
+- LangSmith-compatible optional tracing
+- 30-case gold-set evaluation with clean, ambiguous, and adversarial tiers
+- Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, drift detection, and confidence calibration
+
+## Architecture Diagram
+
+```mermaid
+flowchart LR
+    A["Loan Case"] --> B["Term Extractor Agent"]
+    B --> C["Schema Validator"]
+    C --> D["Compliance Checker Agent"]
+    C --> E["Credit Risk Scorer Agent"]
+    D --> F["Review Synthesizer"]
+    E --> F
+    F --> G["Contradiction Detection"]
+    F --> H["Counterfactual Explanations"]
+    F --> I["Human Override Audit Log"]
+    F --> J["PDF Review Packet"]
+    F --> K["Evaluation Harness"]
+    K --> L["Gold Set Metrics"]
+    K --> M["Ablation"]
+    K --> N["Judge Agreement"]
+    K --> O["Drift + Calibration"]
+```
 
 ## Architecture
 
@@ -78,11 +122,21 @@ loan_pipeline/
 docs/
   architecture.md
   data_source.md
+  demo_script.md
   evaluation_plan.md
+  cv_bullets.md
 requirements.txt
 README.md
 tests/
 ```
+
+## Useful Docs
+
+- [Architecture](docs/architecture.md)
+- [Evaluation Plan](docs/evaluation_plan.md)
+- [Data Source Notes](docs/data_source.md)
+- [Demo Script](docs/demo_script.md)
+- [CV And Interview Notes](docs/cv_bullets.md)
 
 ## Setup
 
@@ -131,29 +185,17 @@ Run the app:
 streamlit run loan_pipeline/ui/app.py
 ```
 
-The dashboard includes loan review, evaluation metrics, ablation results, judge agreement, and report preview tabs.
+The dashboard includes loan review, reviewer policy comparison, evaluation metrics, ablation results, drift detection, judge agreement, PDF export, and report preview tabs.
 
 ## Demo Script
 
-1. Open the dashboard:
+See [docs/demo_script.md](docs/demo_script.md) for the polished presentation walkthrough.
+
+Quick start:
 
 ```powershell
 streamlit run loan_pipeline/ui/app.py
 ```
-
-2. In `Loan Review`, select `ADV-003` to show an adversarial case where the current risk scorer misses the gold risk band.
-3. Run the pipeline and show the human review packet, agent outputs, and graph state.
-4. Show the `Agent Contradictions` panel when compliance and credit-risk signals conflict.
-5. Show the `Counterfactual Explanations` panel to explain what would make the review outcome improve.
-6. Add a human override with a rationale in the `Human Override Audit Log`.
-7. Download or save the PDF review packet as the final business artifact.
-8. Use `Compare reviewer policies` to show how SBA, bank, and CDFI review postures differ.
-9. Open `Evaluation` to show the 30-case gold set metrics by clean, ambiguous, and adversarial tiers.
-10. Open `Ablation` to show the contribution chart and prove each agent earns its place.
-11. In `Evaluation`, show confidence calibration for the risk scorer.
-12. Open `Drift` to show repeated-run stability across the gold set.
-13. Open `Judge Agreement` to show primary vs secondary judge agreement and the manual spot-check queue.
-14. Open `Report` and generate the Markdown evaluation report.
 
 ## Cupcake MVP
 
