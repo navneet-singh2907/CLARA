@@ -27,6 +27,7 @@ Loan review decisions can affect whether a small business receives capital, surv
 - 30-case gold-set evaluation with clean, ambiguous, and adversarial tiers
 - Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, drift detection, and confidence calibration
 - Per-case progress indicators for full live 30-case evaluation and judge runs
+- FastAPI SSE streaming endpoints for live agent and evaluation events
 - GitHub Actions CI for lint, compile, and tests
 
 ## Results Snapshot
@@ -215,6 +216,24 @@ streamlit run loan_pipeline/ui/app.py
 ```
 
 The dashboard includes loan review, reviewer policy comparison, evaluation metrics, ablation results, drift detection, judge agreement, PDF export, and report preview tabs.
+
+Run the optional SSE API:
+
+```powershell
+uvicorn loan_pipeline.api.app:app --reload --port 8000
+```
+
+Useful streaming endpoints:
+
+```text
+GET http://127.0.0.1:8000/health
+GET http://127.0.0.1:8000/cases
+GET http://127.0.0.1:8000/review/stream?case_id=ADV-001&policy=sba_reviewer
+GET http://127.0.0.1:8000/evaluation/stream
+GET http://127.0.0.1:8000/judge-agreement/stream
+```
+
+The SSE API emits events such as `run_started`, `agent_completed`, `progress`, `run_completed`, and `error`. This is intended for production-style observability and demoing that the agents are actively moving through the graph.
 
 ## Demo Script
 

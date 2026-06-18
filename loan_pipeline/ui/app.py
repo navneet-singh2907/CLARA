@@ -24,8 +24,8 @@ from loan_pipeline.eval.report import (
     write_evaluation_report,
 )
 from loan_pipeline.eval.run_eval import run_eval
-from loan_pipeline.graph.orchestrator import run_pipeline_with_state
-from loan_pipeline.graph.state import LoanCase, ReviewPolicy
+from loan_pipeline.graph.orchestrator import build_review_graph, run_pipeline_with_state
+from loan_pipeline.graph.state import GraphState, LoanCase, ReviewPolicy, initial_state
 from loan_pipeline.review.audit import OverrideTarget, create_human_override
 from loan_pipeline.review.pdf_export import build_review_packet_pdf, write_review_packet_pdf
 from loan_pipeline.review.policies import POLICY_PROFILES
@@ -34,6 +34,16 @@ st.set_page_config(
     page_title="Small Business Loan Review",
     layout="wide",
 )
+
+PIPELINE_NODE_LABELS = {
+    "term_extractor": "Term Extractor",
+    "schema_validator": "Schema Validator",
+    "compliance_checker": "Compliance Checker",
+    "credit_risk_scorer": "Credit Risk Scorer",
+    "review_synthesizer": "Review Synthesizer",
+}
+
+EXPECTED_PIPELINE_NODES = set(PIPELINE_NODE_LABELS)
 
 
 @st.cache_data(show_spinner=False)
@@ -93,6 +103,98 @@ def run_inter_rater_with_progress() -> dict:
         status.write(f"Live judge agreement: {completed}/{total} cases complete. Latest: {case_id}")
 
     return run_inter_rater_report(progress_callback=update)
+
+
+def run_pipeline_with_ui_events(
+    loan_case: LoanCase,
+    review_policy: ReviewPolicy,
+) -> GraphState:
+    graph = build_review_graph()
+    state = initial_state(loan_case, review_policy=review_policy)
+    completed_nodes: set[str] = set()
+    event_rows: list[dict[str, str | float | None]] = []
+
+    st.subheader("Live LangGraph Agent Timeline")
+    st.caption(
+        "This panel streams the same run triggered by the button below, so the demo shows "
+        "which agent completed, which stage it belongs to, and where parallel review happens."
+    )
+    status_box = st.status("Starting LangGraph loan review", expanded=True)
+    progress_bar = st.progress(0)
+    event_table = st.empty()
+
+    status_box.write(f"Run started for {loan_case.case_id} - {loan_case.borrower_name}")
+    status_box.write(f"Reviewer policy: {review_policy}")
+    status_box.write("Orchestrator queued: term extraction -> validation -> parallel specialist review -> synthesis.")
+
+    try:
+        for chunk in graph.stream(initial_state(loan_case, review_policy=review_policy)):
+            for node, update in chunk.items():
+                _merge_graph_update(state, update)
+                trace_entries = update.get("execution_trace", [])
+
+                if not trace_entries:
+                    status_box.write(f"Graph update received from {PIPELINE_NODE_LABELS.get(node, node)}")
+
+                for trace_entry in trace_entries:
+                    completed_nodes.add(trace_entry.node)
+                    label = PIPELINE_NODE_LABELS.get(trace_entry.node, trace_entry.node)
+                    if trace_entry.parallel_group == "specialist_review":
+                        label = f"{label} (parallel specialist stage)"
+
+                    status_box.write(
+                        f"{label} completed in {trace_entry.duration_ms:.1f} ms "
+                        f"with status {trace_entry.status}."
+                    )
+                    event_rows.append(
+                        {
+                            "agent": PIPELINE_NODE_LABELS.get(trace_entry.node, trace_entry.node),
+                            "node": trace_entry.node,
+                            "stage": trace_entry.stage,
+                            "parallel_group": trace_entry.parallel_group,
+                            "duration_ms": trace_entry.duration_ms,
+                            "status": trace_entry.status,
+                        }
+                    )
+
+                progress = len(completed_nodes & EXPECTED_PIPELINE_NODES) / len(EXPECTED_PIPELINE_NODES)
+                progress_bar.progress(min(1.0, progress))
+                if event_rows:
+                    event_table.dataframe(pd.DataFrame(event_rows), use_container_width=True, hide_index=True)
+
+        if state["review_packet"] is None:
+            status_box.update(label="LangGraph run finished without a review packet", state="error")
+            return state
+
+        packet = state["review_packet"]
+        progress_bar.progress(1.0)
+        status_box.write(
+            f"Final packet created: outcome={packet.recommended_outcome}, "
+            f"risk={packet.risk.band}, compliance={packet.compliance.status}."
+        )
+        if packet.escalation_required:
+            status_box.write("Human gate: escalation required because one or more findings need review.")
+        else:
+            status_box.write("Human gate: no escalation required for this packet.")
+        status_box.update(label="LangGraph run completed", state="complete")
+        return state
+    except Exception:
+        status_box.update(label="LangGraph run failed", state="error")
+        raise
+
+
+def _merge_graph_update(state: GraphState, update: dict) -> None:
+    for key, value in update.items():
+        if key in {
+            "validation_errors",
+            "agent_errors",
+            "execution_trace",
+            "contradictions",
+            "counterfactuals",
+        }:
+            state[key].extend(value)
+        else:
+            state[key] = value
 
 
 def write_live_report_with_progress() -> Path:
@@ -355,7 +457,7 @@ def render_loan_review() -> None:
     review_state_key = f"review_state_{loan_case.case_id}_{review_policy}"
     if st.button("Run review pipeline", type="primary"):
         try:
-            st.session_state[review_state_key] = run_pipeline_with_state(
+            st.session_state[review_state_key] = run_pipeline_with_ui_events(
                 loan_case,
                 review_policy=review_policy,
             )
