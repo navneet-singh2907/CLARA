@@ -1,7 +1,12 @@
 """Compliance Checker Agent."""
 
 from loan_pipeline.config import get_settings
-from loan_pipeline.graph.state import ComplianceFinding, ComplianceResult, ExtractedTerms, ReviewPolicy
+from loan_pipeline.graph.state import (
+    ComplianceFinding,
+    ComplianceResult,
+    ExtractedTerms,
+    ReviewPolicy,
+)
 from loan_pipeline.llm.client import add_llm_compliance_note
 from loan_pipeline.review.policies import get_policy_profile
 

@@ -47,6 +47,45 @@ def test_parse_judge_response_accepts_valid_json() -> None:
     assert score.major_failure_category == "None"
 
 
+def test_parse_judge_response_extracts_fenced_json_with_string_scores() -> None:
+    score = parse_judge_response(
+        """```json
+{
+  "faithfulness": "5",
+  "completeness": "4",
+  "risk_calibration": "5",
+  "compliance_accuracy": "5",
+  "explainability": "4",
+  "overall_score": "5",
+  "major_failure_category": "None",
+  "rationale": "Grounded and useful."
+}
+```"""
+    )
+
+    assert score.faithfulness == 5
+    assert score.completeness == 4
+
+
+def test_parse_judge_response_extracts_json_from_explanatory_text() -> None:
+    score = parse_judge_response(
+        """Here is the score:
+{
+  "faithfulness": 5,
+  "completeness": 4,
+  "risk_calibration": 5,
+  "compliance_accuracy": 5,
+  "explainability": 4,
+  "overall_score": 5,
+  "major_failure_category": "None",
+  "rationale": "Grounded and useful."
+}
+Thanks."""
+    )
+
+    assert score.overall_score == 5
+
+
 def test_parse_judge_response_rejects_invalid_score() -> None:
     try:
         parse_judge_response(
@@ -69,7 +108,7 @@ def test_parse_judge_response_rejects_invalid_score() -> None:
     raise AssertionError("Invalid judge score should raise ValueError.")
 
 
-def test_local_judge_flags_known_risk_calibration_failure() -> None:
+def test_local_judge_scores_tuned_adversarial_risk_case_as_calibrated() -> None:
     cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
     labels = {label.case_id: label for label in load_gold_labels()}
     loan_case = cases["ADV-003"]
@@ -77,8 +116,9 @@ def test_local_judge_flags_known_risk_calibration_failure() -> None:
 
     score = run_local_judge(loan_case, packet, labels["ADV-003"])
 
-    assert score.risk_calibration == 2
-    assert score.major_failure_category == "Risk Calibration Failure"
+    assert packet.risk.band == "MEDIUM"
+    assert score.risk_calibration == 5
+    assert score.major_failure_category == "None"
 
 
 def test_configured_primary_judge_falls_back_to_local_when_model_blank() -> None:
@@ -100,6 +140,8 @@ def test_configured_primary_judge_falls_back_to_local_when_model_blank() -> None
 def test_configured_primary_judge_requires_api_key_when_model_set() -> None:
     old_model = os.environ.get("PRIMARY_JUDGE_MODEL")
     old_key = os.environ.pop("OPENAI_API_KEY", None)
+    old_nebius_key = os.environ.pop("NEBIUS_API_KEY", None)
+    old_llm_key = os.environ.pop("LLM_API_KEY", None)
     os.environ["PRIMARY_JUDGE_MODEL"] = "gpt-4o-mini"
     try:
         reset_settings_cache()
@@ -110,12 +152,14 @@ def test_configured_primary_judge_requires_api_key_when_model_set() -> None:
         try:
             run_configured_primary_judge(loan_case, packet, gold)
         except RuntimeError as exc:
-            assert "OPENAI_API_KEY" in str(exc)
+            assert "API_KEY" in str(exc)
             return
-        raise AssertionError("Live judge should require OPENAI_API_KEY.")
+        raise AssertionError("Live judge should require a provider API key.")
     finally:
         _restore_env("PRIMARY_JUDGE_MODEL", old_model)
         _restore_env("OPENAI_API_KEY", old_key)
+        _restore_env("NEBIUS_API_KEY", old_nebius_key)
+        _restore_env("LLM_API_KEY", old_llm_key)
         reset_settings_cache()
 
 

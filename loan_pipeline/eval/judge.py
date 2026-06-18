@@ -44,16 +44,19 @@ Agent output:
 Gold answer:
 {gold_answer}
 
-Return JSON only with this schema:
+All score values MUST be integers between 1 and 5. Do not use words like "high" or "low".
+1 = very poor, 2 = below average, 3 = average, 4 = good, 5 = excellent.
+
+Return JSON only. Example of correct format (replace values with your actual scores):
 {{
-  "faithfulness": 1,
-  "completeness": 1,
-  "risk_calibration": 1,
-  "compliance_accuracy": 1,
-  "explainability": 1,
-  "overall_score": 1,
-  "major_failure_category": "",
-  "rationale": ""
+  "faithfulness": 4,
+  "completeness": 3,
+  "risk_calibration": 5,
+  "compliance_accuracy": 4,
+  "explainability": 5,
+  "overall_score": 4,
+  "major_failure_category": "None",
+  "rationale": "One sentence explaining the scores."
 }}
 """
 
@@ -83,7 +86,7 @@ def build_judge_prompt(loan_case: LoanCase, packet: ReviewPacket, gold: GoldLabe
 
 def parse_judge_response(raw_response: str) -> JudgeScore:
     try:
-        payload = json.loads(raw_response)
+        payload = json.loads(_extract_json_object(raw_response))
     except json.JSONDecodeError as exc:
         raise ValueError("Judge response must be valid JSON.") from exc
 
@@ -119,13 +122,14 @@ def run_model_judge(
     model: str,
 ) -> JudgeScore:
     settings = get_settings()
-    if not settings.openai_api_key:
-        raise RuntimeError("Live judge models require OPENAI_API_KEY.")
+    if not settings.llm_api_key:
+        raise RuntimeError("Live judge models require LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY.")
 
     from langchain_openai import ChatOpenAI
 
     llm = ChatOpenAI(
-        api_key=settings.openai_api_key,
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
         model=model,
         temperature=settings.judge_temperature,
     )
@@ -133,7 +137,7 @@ def run_model_judge(
     content = response.content if hasattr(response, "content") else str(response)
     if not isinstance(content, str):
         content = str(content)
-    return parse_judge_response(_strip_json_fence(content))
+    return parse_judge_response(content)
 
 
 def validate_judge_payload(payload: dict[str, Any]) -> JudgeScore:
@@ -148,9 +152,10 @@ def validate_judge_payload(payload: dict[str, Any]) -> JudgeScore:
         raise ValueError(f"Judge response missing required fields: {', '.join(missing)}.")
 
     for field in [*JUDGE_DIMENSIONS, "overall_score"]:
-        value = payload[field]
-        if not isinstance(value, int) or not 1 <= value <= 5:
+        value = _coerce_score(payload[field])
+        if not 1 <= value <= 5:
             raise ValueError(f"Judge field '{field}' must be an integer from 1 to 5.")
+        payload[field] = value
 
     if not isinstance(payload["major_failure_category"], str):
         raise ValueError("Judge field 'major_failure_category' must be a string.")
@@ -170,6 +175,17 @@ def validate_judge_payload(payload: dict[str, Any]) -> JudgeScore:
     )
 
 
+def _extract_json_object(content: str) -> str:
+    stripped = _strip_json_fence(content)
+    if stripped.startswith("{") and stripped.endswith("}"):
+        return stripped
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return stripped
+    return stripped[start : end + 1]
+
+
 def _strip_json_fence(content: str) -> str:
     stripped = content.strip()
     if stripped.startswith("```"):
@@ -177,6 +193,32 @@ def _strip_json_fence(content: str) -> str:
         if stripped.lower().startswith("json"):
             stripped = stripped[4:].strip()
     return stripped
+
+
+_QUALITATIVE_SCORE_MAP = {
+    "very poor": 1, "very low": 1, "poor": 1,
+    "below average": 2, "low": 2,
+    "average": 3, "moderate": 3, "medium": 3, "fair": 3,
+    "good": 4, "high": 4, "above average": 4,
+    "excellent": 5, "very high": 5, "very good": 5, "perfect": 5,
+}
+
+
+def _coerce_score(value: Any) -> int:
+    if isinstance(value, bool):
+        raise ValueError("Judge score must not be a boolean.")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.isdigit():
+            return int(stripped)
+        mapped = _QUALITATIVE_SCORE_MAP.get(stripped.lower())
+        if mapped is not None:
+            return mapped
+    raise ValueError(f"Judge score {value!r} could not be converted to an integer from 1 to 5.")
 
 
 def run_local_judge(loan_case: LoanCase, packet: ReviewPacket, gold: GoldLabel) -> JudgeScore:

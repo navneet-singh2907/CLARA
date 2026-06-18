@@ -1,8 +1,10 @@
 """Streamlit dashboard for the loan review pipeline."""
 
+import os
+import sys
+from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
-import sys
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -12,18 +14,21 @@ if str(PROJECT_ROOT) not in sys.path:
 import pandas as pd
 import streamlit as st
 
-from loan_pipeline.config import get_settings, load_sba_demo_cases
+from loan_pipeline.config import get_settings, load_sba_demo_cases, reset_settings_cache
 from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
 from loan_pipeline.eval.drift import run_drift_study
 from loan_pipeline.eval.inter_rater import run_inter_rater_report
-from loan_pipeline.eval.report import REPORT_PATH, generate_evaluation_report, write_evaluation_report
+from loan_pipeline.eval.report import (
+    REPORT_PATH,
+    generate_evaluation_report,
+    write_evaluation_report,
+)
 from loan_pipeline.eval.run_eval import run_eval
 from loan_pipeline.graph.orchestrator import run_pipeline_with_state
 from loan_pipeline.graph.state import LoanCase, ReviewPolicy
 from loan_pipeline.review.audit import OverrideTarget, create_human_override
 from loan_pipeline.review.pdf_export import build_review_packet_pdf, write_review_packet_pdf
 from loan_pipeline.review.policies import POLICY_PROFILES
-
 
 st.set_page_config(
     page_title="Small Business Loan Review",
@@ -42,8 +47,20 @@ def cached_eval() -> dict:
 
 
 @st.cache_data(show_spinner=False)
+def cached_offline_eval() -> dict:
+    with deterministic_batch_context():
+        return run_eval()
+
+
+@st.cache_data(show_spinner=False)
 def cached_ablation_table() -> list[dict]:
     return summarize_ablation_table(run_ablation_study())
+
+
+@st.cache_data(show_spinner=False)
+def cached_offline_ablation_table() -> list[dict]:
+    with deterministic_batch_context():
+        return summarize_ablation_table(run_ablation_study())
 
 
 @st.cache_data(show_spinner=False)
@@ -52,8 +69,26 @@ def cached_inter_rater() -> dict:
 
 
 @st.cache_data(show_spinner=False)
+def cached_offline_inter_rater() -> dict:
+    with deterministic_batch_context():
+        return run_inter_rater_report()
+
+
+@st.cache_data(show_spinner=False)
 def cached_drift_study() -> dict:
     return run_drift_study()
+
+
+@st.cache_data(show_spinner=False)
+def cached_offline_drift_study() -> dict:
+    with deterministic_batch_context():
+        return run_drift_study()
+
+
+@st.cache_data(show_spinner=False)
+def cached_offline_report() -> str:
+    with deterministic_batch_context():
+        return generate_evaluation_report()
 
 
 def live_model_mode_enabled() -> bool:
@@ -65,12 +100,39 @@ def live_model_mode_enabled() -> bool:
     )
 
 
-def render_live_batch_guard(action_label: str, key: str, detail: str) -> bool:
-    if not live_model_mode_enabled():
-        return True
+@contextmanager
+def deterministic_batch_context():
+    env_names = [
+        "USE_LLM_AGENTS",
+        "PRIMARY_JUDGE_MODEL",
+        "SECONDARY_JUDGE_MODEL",
+        "LANGSMITH_TRACING",
+        "LANGCHAIN_TRACING_V2",
+    ]
+    previous_values = {name: os.environ.get(name) for name in env_names}
+    os.environ["USE_LLM_AGENTS"] = "false"
+    os.environ["PRIMARY_JUDGE_MODEL"] = ""
+    os.environ["SECONDARY_JUDGE_MODEL"] = ""
+    os.environ["LANGSMITH_TRACING"] = "false"
+    os.environ["LANGCHAIN_TRACING_V2"] = "false"
+    reset_settings_cache()
+    try:
+        yield
+    finally:
+        for name, value in previous_values.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        reset_settings_cache()
 
-    st.warning(
-        "Live model mode is active. This batch view can make many API calls. "
+
+def render_live_batch_option(action_label: str, key: str, detail: str) -> bool:
+    if not live_model_mode_enabled():
+        return False
+
+    st.info(
+        "Live model mode is active. Showing the reproducible offline benchmark by default. "
         f"{detail}"
     )
     return st.button(action_label, key=key, type="primary")
@@ -84,6 +146,7 @@ def main() -> None:
 
     mode_label = "LLM mode" if settings.use_llm_agents else "Deterministic mode"
     st.sidebar.metric("Agent mode", mode_label)
+    st.sidebar.metric("LLM provider", settings.llm_provider if settings.use_llm_agents else "Off")
     st.sidebar.metric("LLM model", settings.openai_model if settings.use_llm_agents else "Off")
     st.sidebar.metric("LLM temperature", f"{settings.llm_temperature:.2f}" if settings.use_llm_agents else "Off")
     st.sidebar.metric("Primary judge", settings.primary_judge_model or "Local")
@@ -123,7 +186,89 @@ def main() -> None:
         render_report_dashboard()
 
 
+def _render_document_input_mode() -> None:
+    settings = get_settings()
+    if not settings.use_llm_agents:
+        st.warning(
+            "Document parsing requires LLM mode. "
+            "Set USE_LLM_AGENTS=true and provide an API key in your .env file."
+        )
+        return
+
+    uploaded = st.file_uploader("Upload PDF (optional)", type=["pdf"])
+    if uploaded is not None:
+        import io
+
+        try:
+            import pdfplumber
+        except ImportError:
+            st.error("PDF upload requires pdfplumber. Run `pip install -r requirements.txt`.")
+            return
+
+        with pdfplumber.open(io.BytesIO(uploaded.read())) as pdf:
+            extracted = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        st.session_state["_doc_text"] = extracted
+
+    doc_text = st.text_area(
+        "Loan application narrative",
+        value=st.session_state.get("_doc_text", ""),
+        height=280,
+        placeholder=(
+            "Paste a raw loan application here - borrower name, industry, loan amount, "
+            "term, credit score, years in business, prior defaults, missing documents. "
+            "The LLM will extract all structured fields."
+        ),
+        key="_doc_text_area",
+    )
+
+    policy_options = {profile.label: policy for policy, profile in POLICY_PROFILES.items()}
+    selected_policy_label = st.selectbox(
+        "Reviewer policy", options=list(policy_options.keys()), key="_doc_policy"
+    )
+    review_policy = policy_options[selected_policy_label]
+
+    if st.button("Parse and review", type="primary", disabled=not doc_text.strip()):
+        from loan_pipeline.llm.client import parse_document_to_loan_case
+        with st.spinner("Parsing document with LLM..."):
+            try:
+                loan_case = parse_document_to_loan_case(doc_text)
+                st.session_state["_doc_loan_case"] = loan_case
+                st.session_state["_doc_review_state"] = run_pipeline_with_state(
+                    loan_case, review_policy=review_policy
+                )
+            except Exception as exc:
+                render_pipeline_error(exc)
+                return
+
+    doc_loan_case = st.session_state.get("_doc_loan_case")
+    if doc_loan_case:
+        st.subheader("Parsed Loan Case")
+        render_case_summary(doc_loan_case)
+
+    state = st.session_state.get("_doc_review_state")
+    if state is None:
+        return
+
+    packet = state["review_packet"]
+    if packet is None:
+        st.error("Pipeline completed without producing a review packet.")
+        return
+
+    _render_packet_output(state, packet)
+
+
 def render_loan_review() -> None:
+    input_mode = st.radio(
+        "Input mode",
+        ["Gold set case", "Paste / Upload document"],
+        horizontal=True,
+    )
+
+    if input_mode == "Paste / Upload document":
+        _render_document_input_mode()
+        return
+
+    # --- Gold set case mode ---
     cases = cached_cases()
     case_options = {f"{case.case_id} - {case.borrower_name}": case.case_id for case in cases}
     selected_label = st.selectbox("SBA loan case", options=list(case_options.keys()))
@@ -150,13 +295,14 @@ def render_loan_review() -> None:
     state = st.session_state.get(review_state_key)
     if state is None:
         return
-
     packet = state["review_packet"]
-
     if packet is None:
         st.error("Pipeline completed without producing a review packet.")
         return
+    _render_packet_output(state, packet)
 
+
+def _render_packet_output(state: dict, packet) -> None:
     st.subheader("Human Review Packet")
     metric_cols = st.columns(4)
     metric_cols[0].metric("Outcome", packet.recommended_outcome)
@@ -166,11 +312,10 @@ def render_loan_review() -> None:
     st.caption(f"Reviewer policy: {POLICY_PROFILES[packet.review_policy].label}")
 
     st.write(packet.summary)
-    settings = get_settings()
-    if settings.use_llm_agents:
+    if get_settings().use_llm_agents:
         st.success(
             "Live LLM agent mode is active. Term extraction, compliance reviewer notes, "
-            "and risk rationale can use model calls."
+            "and risk rationale use model calls."
         )
 
     if packet.human_review_notes:
@@ -211,16 +356,12 @@ def render_loan_review() -> None:
     tab_terms, tab_compliance, tab_risk, tab_state = st.tabs(
         ["Term Extractor", "Compliance Checker", "Credit Risk Scorer", "Graph State"]
     )
-
     with tab_terms:
         st.json(asdict(packet.extracted_terms))
-
     with tab_compliance:
         st.json(asdict(packet.compliance))
-
     with tab_risk:
         st.json(asdict(packet.risk))
-
     with tab_state:
         st.json(
             {
@@ -290,16 +431,25 @@ def render_policy_comparison(loan_case: LoanCase) -> None:
 
 def render_pipeline_error(exc: Exception) -> None:
     message = str(exc)
+    if "does not exist" in message and "model" in message.lower():
+        st.error(
+            "Live model error: the configured model ID is not available from this provider. "
+            "Check OPENAI_MODEL, PRIMARY_JUDGE_MODEL, and SECONDARY_JUDGE_MODEL against "
+            "your provider's /v1/models list."
+        )
+        st.caption(message)
+        return
+
     if "insufficient_quota" in message or "exceeded your current quota" in message:
         st.error(
-            "OpenAI quota error: your API key is valid enough to reach OpenAI, but the account "
-            "does not currently have quota/billing available. Add billing or switch back to "
-            "deterministic mode for offline demo."
+            "Live model quota error: your API key is valid enough to reach the provider, but "
+            "the account does not currently have quota/billing available. Add billing/quota, "
+            "switch provider keys, or switch back to deterministic mode for offline demo."
         )
         return
 
-    if "OPENAI_API_KEY" in message:
-        st.error("Live LLM mode requires OPENAI_API_KEY in your .env file.")
+    if "API_KEY" in message:
+        st.error("Live LLM mode requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY in your .env file.")
         return
 
     st.error(f"Pipeline run failed: {exc}")
@@ -445,19 +595,19 @@ def render_case_summary(loan_case: LoanCase) -> None:
 
 
 def render_evaluation_dashboard() -> None:
-    if not render_live_batch_guard(
-        "Run evaluation",
+    run_live = render_live_batch_option(
+        "Run live evaluation",
         "run_live_evaluation",
-        "Run it intentionally when you want a full judged evaluation trace.",
-    ):
-        st.caption("Waiting to run the 30-case evaluation.")
-        return
+        "Click the button only when you want a full live judged evaluation trace.",
+    )
 
     try:
-        result = cached_eval()
+        result = cached_eval() if run_live or not live_model_mode_enabled() else cached_offline_eval()
     except Exception as exc:
         render_pipeline_error(exc)
         return
+    if live_model_mode_enabled() and not run_live:
+        st.caption("Displaying offline benchmark results. Live evaluation is available with the button above.")
     overall = result["summary"]["overall"]
 
     metric_cols = st.columns(5)
@@ -518,19 +668,23 @@ def render_confidence_calibration(calibration: dict) -> None:
 
 
 def render_ablation_dashboard() -> None:
-    if not render_live_batch_guard(
-        "Run ablation study",
+    run_live = render_live_batch_option(
+        "Run live ablation study",
         "run_live_ablation",
-        "Ablation runs several pipeline configurations across the gold set.",
-    ):
-        st.caption("Waiting to run the ablation table.")
-        return
+        "Live ablation runs several model-backed pipeline configurations across the gold set.",
+    )
 
     try:
-        rows = cached_ablation_table()
+        rows = (
+            cached_ablation_table()
+            if run_live or not live_model_mode_enabled()
+            else cached_offline_ablation_table()
+        )
     except Exception as exc:
         render_pipeline_error(exc)
         return
+    if live_model_mode_enabled() and not run_live:
+        st.caption("Displaying offline ablation results. Live ablation is available with the button above.")
     table = pd.DataFrame(rows)
     st.dataframe(table, use_container_width=True, hide_index=True)
 
@@ -607,19 +761,23 @@ def ablation_chart_data(rows: list[dict]) -> pd.DataFrame:
 
 
 def render_drift_dashboard() -> None:
-    if not render_live_batch_guard(
-        "Run drift study",
+    run_live = render_live_batch_option(
+        "Run live drift study",
         "run_live_drift",
-        "Drift repeats each case multiple times to measure output variance.",
-    ):
-        st.caption("Waiting to run repeated-case drift analysis.")
-        return
+        "Live drift repeats each case multiple times to measure model-output variance.",
+    )
 
     try:
-        result = cached_drift_study()
+        result = (
+            cached_drift_study()
+            if run_live or not live_model_mode_enabled()
+            else cached_offline_drift_study()
+        )
     except Exception as exc:
         render_pipeline_error(exc)
         return
+    if live_model_mode_enabled() and not run_live:
+        st.caption("Displaying offline drift results. Live drift is available with the button above.")
 
     metric_cols = st.columns(4)
     metric_cols[0].metric("Cases", result["cases"])
@@ -643,27 +801,45 @@ def render_drift_dashboard() -> None:
 
 
 def render_judge_dashboard() -> None:
-    if not render_live_batch_guard(
-        "Run judge agreement",
+    run_live = render_live_batch_option(
+        "Run live judge agreement",
         "run_live_judge_agreement",
-        "Judge agreement may call both configured judge models across the gold set.",
-    ):
-        st.caption("Waiting to run primary/secondary judge agreement.")
-        return
+        "The live button runs primary and secondary judges across all 30 gold-set cases.",
+    )
 
     try:
-        eval_result = cached_eval()
-        inter_rater = cached_inter_rater()
+        if run_live:
+            with st.spinner("Running live primary/secondary judge agreement across all 30 cases..."):
+                inter_rater = cached_inter_rater()
+            judge_summary = inter_rater["primary_judge_summary"]
+            judge_summary_label = "Live Primary Judge Summary"
+            settings = get_settings()
+            st.success(
+                f"Live judge agreement completed for {inter_rater['cases']} cases using "
+                f"{settings.primary_judge_model} and {settings.secondary_judge_model}."
+            )
+        elif not live_model_mode_enabled():
+            eval_result = cached_eval()
+            inter_rater = cached_inter_rater()
+            judge_summary = eval_result["local_judge_summary"]
+            judge_summary_label = "Local Judge Summary"
+        else:
+            eval_result = cached_offline_eval()
+            inter_rater = cached_offline_inter_rater()
+            judge_summary = eval_result["local_judge_summary"]
+            judge_summary_label = "Offline Judge Summary"
     except Exception as exc:
         render_pipeline_error(exc)
         return
+    if live_model_mode_enabled() and not run_live:
+        st.caption("Displaying offline judge-agreement results. Live judge agreement is available with the button above.")
 
-    st.subheader("Local Judge Summary")
+    st.subheader(judge_summary_label)
     st.dataframe(
         pd.DataFrame(
             [
                 {"dimension": dimension, "average_score": score}
-                for dimension, score in eval_result["local_judge_summary"].items()
+                for dimension, score in judge_summary.items()
             ]
         ),
         use_container_width=True,
@@ -675,6 +851,14 @@ def render_judge_dashboard() -> None:
     metric_cols[1].metric("Within 1 Point", pct(inter_rater["within_one_point_agreement"]))
     metric_cols[2].metric("Avg Delta", f"{inter_rater['average_score_delta']:.4f}")
     metric_cols[3].metric("Disagreements", inter_rater["disagreement_case_count"])
+
+    if run_live and inter_rater.get("case_rows"):
+        st.subheader("Live Judge Audit Trail")
+        st.dataframe(
+            pd.DataFrame(inter_rater["case_rows"]),
+            use_container_width=True,
+            hide_index=True,
+        )
 
     st.subheader("Manual Spot-Check Queue")
     st.write(", ".join(inter_rater["manual_spot_check_cases"]) or "None")
@@ -689,33 +873,23 @@ def render_judge_dashboard() -> None:
 
 def render_report_dashboard() -> None:
     live_mode = live_model_mode_enabled()
-    should_generate = st.button("Generate evaluation report", type="primary")
-    if live_mode and not should_generate:
-        st.warning(
-            "Live model mode is active. Report generation can trigger the full evaluation, "
-            "ablation, drift, and judge-agreement runs."
+    run_live = False
+    if live_mode:
+        st.info(
+            "Live model mode is active. Showing the reproducible offline report by default. "
+            "Click below to generate the full 30-case live evaluation report."
         )
-        if REPORT_PATH.exists():
-            report_text = REPORT_PATH.read_text(encoding="utf-8")
-            st.caption(f"Showing existing report: {REPORT_PATH}")
-            st.download_button(
-                "Download existing evaluation report",
-                data=report_text,
-                file_name="evaluation_report.md",
-                mime="text/markdown",
-            )
-            st.markdown(report_text)
-        else:
-            st.caption("No existing report found yet.")
-        return
+        run_live = st.button("Generate full live evaluation report", type="primary")
+    else:
+        run_live = st.button("Generate evaluation report", type="primary")
 
     try:
-        if should_generate:
+        if run_live or not live_mode:
             path = write_evaluation_report()
             st.success(f"Generated {path}")
             report_text = path.read_text(encoding="utf-8")
         else:
-            report_text = generate_evaluation_report()
+            report_text = cached_offline_report()
     except Exception as exc:
         render_pipeline_error(exc)
         return

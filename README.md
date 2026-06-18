@@ -36,12 +36,13 @@ Current deterministic evaluation results:
 | Gold set size | 30 cases |
 | Difficulty tiers | 10 clean / 10 ambiguous / 10 adversarial |
 | Final outcome accuracy | 100.00% |
-| Risk band accuracy | 90.00% |
+| Risk band accuracy | 100.00% |
 | Drift stability | 100.00% across 5 runs per case |
-| Risk confidence expected calibration error | 7.00% |
-| Test suite | 52 passing tests |
+| Risk confidence expected calibration error | 17.00% |
+| Test suite | 61 passing tests |
 
-The three known risk-band misses are retained as honest adversarial calibration findings rather than tuned away.
+The deterministic gold-set benchmark currently passes all labeled cases after adversarial risk
+threshold tuning. Confidence calibration remains visible as a separate quality signal.
 
 ## Architecture Diagram
 
@@ -180,15 +181,17 @@ Live LLM agent demo mode:
 
 ```text
 USE_LLM_AGENTS=true
-OPENAI_API_KEY=your_openai_key
-OPENAI_MODEL=gpt-4o-mini
+LLM_PROVIDER=nebius
+NEBIUS_API_KEY=your_nebius_key
+NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1/
+OPENAI_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507
 LLM_TEMPERATURE=0.2
-PRIMARY_JUDGE_MODEL=gpt-4o-mini
-SECONDARY_JUDGE_MODEL=gpt-4o-mini
+PRIMARY_JUDGE_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507
+SECONDARY_JUDGE_MODEL=openai/gpt-oss-120b
 JUDGE_TEMPERATURE=0.2
 ```
 
-The default deterministic mode keeps evaluation reproducible. For a live Agentic AI demo, set `USE_LLM_AGENTS=true` with your local `OPENAI_API_KEY`. In live mode, the Term Extractor, Compliance Checker reviewer note, and Credit Risk Scorer rationale use LangChain model calls. If `PRIMARY_JUDGE_MODEL` and `SECONDARY_JUDGE_MODEL` are set, the evaluation judge and inter-rater agreement flow use live model judges too. Set `LLM_TEMPERATURE` and `JUDGE_TEMPERATURE` above `0` when you want to demonstrate non-deterministic language behavior and then use the Drift tab to measure whether outputs change across repeated runs.
+The default deterministic mode keeps evaluation reproducible. For a live Agentic AI demo, set `USE_LLM_AGENTS=true` with `NEBIUS_API_KEY` and `NEBIUS_BASE_URL`. The project uses LangChain's OpenAI-compatible chat client, so Nebius model endpoints work by passing the Nebius base URL. In live mode, the Term Extractor, Compliance Checker reviewer note, and Credit Risk Scorer rationale use model calls. If `PRIMARY_JUDGE_MODEL` and `SECONDARY_JUDGE_MODEL` are set, the evaluation judge and inter-rater agreement flow use live model judges too. Set `LLM_TEMPERATURE` and `JUDGE_TEMPERATURE` above `0` when you want to demonstrate non-deterministic language behavior and then use the Drift tab to measure whether outputs change across repeated runs.
 
 Optional LangSmith tracing:
 

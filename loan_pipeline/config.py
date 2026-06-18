@@ -24,6 +24,9 @@ class Settings:
     use_llm_agents: bool
     openai_api_key: str | None
     openai_model: str
+    llm_api_key: str | None
+    llm_base_url: str | None
+    llm_provider: str
     llm_temperature: float
     primary_judge_model: str | None
     secondary_judge_model: str | None
@@ -34,11 +37,19 @@ class Settings:
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    nebius_api_key = os.getenv("NEBIUS_API_KEY") or None
+    openai_api_key = os.getenv("OPENAI_API_KEY") or None
+    llm_base_url = os.getenv("LLM_BASE_URL") or os.getenv("NEBIUS_BASE_URL") or None
+    llm_provider = os.getenv("LLM_PROVIDER") or ("nebius" if nebius_api_key else "openai")
+
     return Settings(
         app_env=os.getenv("APP_ENV", "local"),
         use_llm_agents=_env_bool("USE_LLM_AGENTS", default=False),
-        openai_api_key=os.getenv("OPENAI_API_KEY") or None,
+        openai_api_key=openai_api_key,
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        llm_api_key=os.getenv("LLM_API_KEY") or nebius_api_key or openai_api_key,
+        llm_base_url=llm_base_url,
+        llm_provider=llm_provider,
         llm_temperature=float(os.getenv("LLM_TEMPERATURE", "0.2")),
         primary_judge_model=os.getenv("PRIMARY_JUDGE_MODEL") or None,
         secondary_judge_model=os.getenv("SECONDARY_JUDGE_MODEL") or None,

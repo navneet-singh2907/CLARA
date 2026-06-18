@@ -12,6 +12,22 @@ def test_inter_rater_report_scores_30_cases() -> None:
     assert 0 <= report["within_one_point_agreement"] <= 1
 
 
+def test_inter_rater_report_can_limit_case_count() -> None:
+    report = run_inter_rater_report(case_limit=3)
+
+    assert report["cases"] == 3
+    assert "primary_judge_summary" in report
+    assert "secondary_judge_summary" in report
+
+
+def test_inter_rater_report_can_select_case_ids() -> None:
+    report = run_inter_rater_report(case_ids=["AMB-001", "ADV-001", "ADV-003"])
+
+    assert report["cases"] == 3
+    assert [row["case_id"] for row in report["case_rows"]] == ["AMB-001", "ADV-001", "ADV-003"]
+    assert all("primary_rationale" in row for row in report["case_rows"])
+
+
 def test_inter_rater_report_identifies_disagreement_cases() -> None:
     report = run_inter_rater_report()
 

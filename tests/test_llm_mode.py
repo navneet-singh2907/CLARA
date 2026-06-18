@@ -49,6 +49,29 @@ def test_live_judge_models_are_configurable() -> None:
         reset_settings_cache()
 
 
+def test_nebius_provider_configuration_is_supported() -> None:
+    old_provider = os.environ.get("LLM_PROVIDER")
+    old_key = os.environ.get("NEBIUS_API_KEY")
+    old_base_url = os.environ.get("NEBIUS_BASE_URL")
+    old_model = os.environ.get("OPENAI_MODEL")
+    os.environ["NEBIUS_API_KEY"] = "test-nebius-key"
+    os.environ["NEBIUS_BASE_URL"] = "https://api.tokenfactory.nebius.com/v1/"
+    os.environ["OPENAI_MODEL"] = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    try:
+        reset_settings_cache()
+        settings = get_settings()
+        assert settings.llm_provider == "nebius"
+        assert settings.llm_api_key == "test-nebius-key"
+        assert settings.llm_base_url == "https://api.tokenfactory.nebius.com/v1/"
+        assert settings.openai_model == "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    finally:
+        _restore_env("LLM_PROVIDER", old_provider)
+        _restore_env("NEBIUS_API_KEY", old_key)
+        _restore_env("NEBIUS_BASE_URL", old_base_url)
+        _restore_env("OPENAI_MODEL", old_model)
+        reset_settings_cache()
+
+
 def test_deterministic_agents_run_without_api_key_when_llm_mode_off() -> None:
     old_flag = os.environ.get("USE_LLM_AGENTS")
     old_key = os.environ.pop("OPENAI_API_KEY", None)
@@ -71,6 +94,8 @@ def test_deterministic_agents_run_without_api_key_when_llm_mode_off() -> None:
 def test_llm_mode_requires_api_key() -> None:
     old_flag = os.environ.get("USE_LLM_AGENTS")
     old_key = os.environ.pop("OPENAI_API_KEY", None)
+    old_nebius_key = os.environ.pop("NEBIUS_API_KEY", None)
+    old_llm_key = os.environ.pop("LLM_API_KEY", None)
     os.environ["USE_LLM_AGENTS"] = "true"
 
     try:
@@ -79,12 +104,14 @@ def test_llm_mode_requires_api_key() -> None:
         try:
             extract_terms(loan_case)
         except RuntimeError as exc:
-            assert "OPENAI_API_KEY" in str(exc)
+            assert "API_KEY" in str(exc)
             return
-        raise AssertionError("LLM mode should require OPENAI_API_KEY.")
+        raise AssertionError("LLM mode should require a provider API key.")
     finally:
         _restore_env("USE_LLM_AGENTS", old_flag)
         _restore_env("OPENAI_API_KEY", old_key)
+        _restore_env("NEBIUS_API_KEY", old_nebius_key)
+        _restore_env("LLM_API_KEY", old_llm_key)
         reset_settings_cache()
 
 

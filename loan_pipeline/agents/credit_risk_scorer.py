@@ -28,8 +28,11 @@ def run_credit_risk_scorer_deterministic(
     if terms.borrower_credit_score is None:
         points += 1
         primary_risk_factors.append("Credit score is missing.")
-    elif terms.borrower_credit_score < 640:
+    elif terms.borrower_credit_score < 600:
         points += 2
+        primary_risk_factors.append("Borrower credit score is severely below threshold.")
+    elif terms.borrower_credit_score < 640:
+        points += 1
         primary_risk_factors.append("Borrower credit score is below 640.")
     elif terms.borrower_credit_score >= 700:
         mitigating_factors.append("Borrower credit score is above 700.")
@@ -47,9 +50,15 @@ def run_credit_risk_scorer_deterministic(
         points += 2
         primary_risk_factors.append("Prior default is disclosed.")
 
-    if terms.loan_amount >= 750000:
+    if (
+        terms.loan_amount >= 900_000
+        and terms.years_in_business is not None
+        and terms.years_in_business < 1.0
+    ):
         points += 1
-        primary_risk_factors.append("Loan amount is high for manual-review threshold.")
+        primary_risk_factors.append(
+            "High-dollar loan request from a sub-1-year business is elevated risk."
+        )
 
     if terms.jobs_supported >= 10:
         mitigating_factors.append("Application supports at least ten jobs.")

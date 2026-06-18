@@ -7,10 +7,16 @@ from loan_pipeline.agents.compliance_checker import run_compliance_checker
 from loan_pipeline.agents.credit_risk_scorer import run_credit_risk_scorer
 from loan_pipeline.agents.term_extractor import extract_terms
 from loan_pipeline.config import load_sba_demo_cases
-from loan_pipeline.eval.metrics import CaseScore, GoldLabel, score_case, summarize_scores
+from loan_pipeline.eval.metrics import CaseScore, score_case, summarize_scores
 from loan_pipeline.eval.run_eval import load_gold_labels
 from loan_pipeline.graph.orchestrator import run_pipeline, synthesize_review_packet
-from loan_pipeline.graph.state import ComplianceResult, ExtractedTerms, LoanCase, ReviewPacket, RiskResult
+from loan_pipeline.graph.state import (
+    ComplianceResult,
+    ExtractedTerms,
+    LoanCase,
+    ReviewPacket,
+    RiskResult,
+)
 
 AblationRunner = Callable[[LoanCase], ReviewPacket]
 

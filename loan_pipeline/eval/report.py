@@ -107,7 +107,7 @@ def _parallel_execution_trace() -> str:
         "The graph fans out after schema validation so independent specialists can review the same extracted terms before synthesis.",
         "",
         f"- Sample case: {sample_case.case_id}",
-        f"- Parallel group: specialist_review",
+        "- Parallel group: specialist_review",
         f"- Parallel nodes: {', '.join(parallel_nodes)}",
         "",
         "| Node | Stage | Parallel Group | Duration ms | Status |",

@@ -1,5 +1,6 @@
 """LangChain client helpers used only when LLM agent mode is enabled."""
 
+import hashlib
 import json
 from dataclasses import asdict, replace
 from typing import Any
@@ -8,6 +9,7 @@ from loan_pipeline.config import Settings, get_settings
 from loan_pipeline.graph.state import ComplianceResult, ExtractedTerms, LoanCase, RiskResult
 from loan_pipeline.llm.prompts import (
     COMPLIANCE_RATIONALE_PROMPT,
+    DOCUMENT_PARSE_PROMPT,
     RISK_RATIONALE_PROMPT,
     TERM_EXTRACTION_PROMPT,
 )
@@ -78,10 +80,38 @@ def add_llm_risk_rationale(terms: ExtractedTerms, risk: RiskResult) -> RiskResul
     return replace(risk, rationale=rationale)
 
 
+def parse_document_to_loan_case(document_text: str) -> LoanCase:
+    settings = _require_llm_settings()
+    payload = _invoke_json_prompt(
+        settings=settings,
+        prompt=DOCUMENT_PARSE_PROMPT.format(document_text=document_text.strip()),
+    )
+    case_id = "DOC-" + hashlib.sha256(document_text.encode()).hexdigest()[:8].upper()
+    credit_score = payload.get("borrower_credit_score")
+    years = payload.get("years_in_business")
+    missing = payload.get("missing_documents") or []
+    return LoanCase(
+        case_id=case_id,
+        borrower_name=str(payload.get("borrower_name") or "Unknown Borrower"),
+        industry=str(payload.get("industry") or ""),
+        naics_code=str(payload.get("naics_code") or ""),
+        loan_amount=float(payload.get("loan_amount") or 0),
+        sba_guaranteed_amount=float(payload.get("sba_guaranteed_amount") or 0),
+        term_months=int(payload.get("term_months") or 0),
+        jobs_supported=int(payload.get("jobs_supported") or 0),
+        borrower_credit_score=int(credit_score) if credit_score is not None else None,
+        years_in_business=float(years) if years is not None else None,
+        prior_default=bool(payload.get("prior_default", False)),
+        missing_documents=[str(d) for d in missing],
+        notes=str(payload.get("notes") or ""),
+        difficulty_tier="unknown",
+    )
+
+
 def _require_llm_settings() -> Settings:
     settings = get_settings()
-    if not settings.openai_api_key:
-        raise RuntimeError("USE_LLM_AGENTS=true requires OPENAI_API_KEY.")
+    if not settings.llm_api_key:
+        raise RuntimeError("USE_LLM_AGENTS=true requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY.")
     return settings
 
 
@@ -89,7 +119,8 @@ def _invoke_json_prompt(settings: Settings, prompt: str) -> dict[str, Any]:
     from langchain_openai import ChatOpenAI
 
     llm = ChatOpenAI(
-        api_key=settings.openai_api_key,
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
         model=settings.openai_model,
         temperature=settings.llm_temperature,
     )
