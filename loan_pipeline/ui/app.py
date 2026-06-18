@@ -56,6 +56,26 @@ def cached_drift_study() -> dict:
     return run_drift_study()
 
 
+def live_model_mode_enabled() -> bool:
+    settings = get_settings()
+    return bool(
+        settings.use_llm_agents
+        or settings.primary_judge_model
+        or settings.secondary_judge_model
+    )
+
+
+def render_live_batch_guard(action_label: str, key: str, detail: str) -> bool:
+    if not live_model_mode_enabled():
+        return True
+
+    st.warning(
+        "Live model mode is active. This batch view can make many API calls. "
+        f"{detail}"
+    )
+    return st.button(action_label, key=key, type="primary")
+
+
 def main() -> None:
     settings = get_settings()
 
@@ -118,10 +138,14 @@ def render_loan_review() -> None:
 
     review_state_key = f"review_state_{loan_case.case_id}_{review_policy}"
     if st.button("Run review pipeline", type="primary"):
-        st.session_state[review_state_key] = run_pipeline_with_state(
-            loan_case,
-            review_policy=review_policy,
-        )
+        try:
+            st.session_state[review_state_key] = run_pipeline_with_state(
+                loan_case,
+                review_policy=review_policy,
+            )
+        except Exception as exc:
+            render_pipeline_error(exc)
+            return
 
     state = st.session_state.get(review_state_key)
     if state is None:
@@ -231,9 +255,24 @@ def render_policy_note(review_policy: ReviewPolicy) -> None:
 
 def render_policy_comparison(loan_case: LoanCase) -> None:
     with st.expander("Compare reviewer policies"):
+        settings = get_settings()
+        if settings.use_llm_agents:
+            st.warning(
+                "Live LLM mode is active. Running policy comparison will execute the pipeline "
+                "for all reviewer policies and may use multiple model calls."
+            )
+
+        if not st.button("Run policy comparison"):
+            st.caption("Click to compare this loan under SBA, bank, and CDFI review postures.")
+            return
+
         rows = []
         for policy, profile in POLICY_PROFILES.items():
-            packet = run_pipeline_with_state(loan_case, review_policy=policy)["review_packet"]
+            try:
+                packet = run_pipeline_with_state(loan_case, review_policy=policy)["review_packet"]
+            except Exception as exc:
+                render_pipeline_error(exc)
+                return
             if packet is None:
                 continue
             rows.append(
@@ -247,6 +286,23 @@ def render_policy_comparison(loan_case: LoanCase) -> None:
                 }
             )
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+def render_pipeline_error(exc: Exception) -> None:
+    message = str(exc)
+    if "insufficient_quota" in message or "exceeded your current quota" in message:
+        st.error(
+            "OpenAI quota error: your API key is valid enough to reach OpenAI, but the account "
+            "does not currently have quota/billing available. Add billing or switch back to "
+            "deterministic mode for offline demo."
+        )
+        return
+
+    if "OPENAI_API_KEY" in message:
+        st.error("Live LLM mode requires OPENAI_API_KEY in your .env file.")
+        return
+
+    st.error(f"Pipeline run failed: {exc}")
 
 
 def render_human_override_panel(packet) -> None:
@@ -389,7 +445,19 @@ def render_case_summary(loan_case: LoanCase) -> None:
 
 
 def render_evaluation_dashboard() -> None:
-    result = cached_eval()
+    if not render_live_batch_guard(
+        "Run evaluation",
+        "run_live_evaluation",
+        "Run it intentionally when you want a full judged evaluation trace.",
+    ):
+        st.caption("Waiting to run the 30-case evaluation.")
+        return
+
+    try:
+        result = cached_eval()
+    except Exception as exc:
+        render_pipeline_error(exc)
+        return
     overall = result["summary"]["overall"]
 
     metric_cols = st.columns(5)
@@ -450,7 +518,19 @@ def render_confidence_calibration(calibration: dict) -> None:
 
 
 def render_ablation_dashboard() -> None:
-    rows = cached_ablation_table()
+    if not render_live_batch_guard(
+        "Run ablation study",
+        "run_live_ablation",
+        "Ablation runs several pipeline configurations across the gold set.",
+    ):
+        st.caption("Waiting to run the ablation table.")
+        return
+
+    try:
+        rows = cached_ablation_table()
+    except Exception as exc:
+        render_pipeline_error(exc)
+        return
     table = pd.DataFrame(rows)
     st.dataframe(table, use_container_width=True, hide_index=True)
 
@@ -527,7 +607,19 @@ def ablation_chart_data(rows: list[dict]) -> pd.DataFrame:
 
 
 def render_drift_dashboard() -> None:
-    result = cached_drift_study()
+    if not render_live_batch_guard(
+        "Run drift study",
+        "run_live_drift",
+        "Drift repeats each case multiple times to measure output variance.",
+    ):
+        st.caption("Waiting to run repeated-case drift analysis.")
+        return
+
+    try:
+        result = cached_drift_study()
+    except Exception as exc:
+        render_pipeline_error(exc)
+        return
 
     metric_cols = st.columns(4)
     metric_cols[0].metric("Cases", result["cases"])
@@ -551,8 +643,20 @@ def render_drift_dashboard() -> None:
 
 
 def render_judge_dashboard() -> None:
-    eval_result = cached_eval()
-    inter_rater = cached_inter_rater()
+    if not render_live_batch_guard(
+        "Run judge agreement",
+        "run_live_judge_agreement",
+        "Judge agreement may call both configured judge models across the gold set.",
+    ):
+        st.caption("Waiting to run primary/secondary judge agreement.")
+        return
+
+    try:
+        eval_result = cached_eval()
+        inter_rater = cached_inter_rater()
+    except Exception as exc:
+        render_pipeline_error(exc)
+        return
 
     st.subheader("Local Judge Summary")
     st.dataframe(
@@ -584,11 +688,38 @@ def render_judge_dashboard() -> None:
 
 
 def render_report_dashboard() -> None:
-    if st.button("Generate evaluation report", type="primary"):
-        path = write_evaluation_report()
-        st.success(f"Generated {path}")
+    live_mode = live_model_mode_enabled()
+    should_generate = st.button("Generate evaluation report", type="primary")
+    if live_mode and not should_generate:
+        st.warning(
+            "Live model mode is active. Report generation can trigger the full evaluation, "
+            "ablation, drift, and judge-agreement runs."
+        )
+        if REPORT_PATH.exists():
+            report_text = REPORT_PATH.read_text(encoding="utf-8")
+            st.caption(f"Showing existing report: {REPORT_PATH}")
+            st.download_button(
+                "Download existing evaluation report",
+                data=report_text,
+                file_name="evaluation_report.md",
+                mime="text/markdown",
+            )
+            st.markdown(report_text)
+        else:
+            st.caption("No existing report found yet.")
+        return
 
-    report_text = generate_evaluation_report()
+    try:
+        if should_generate:
+            path = write_evaluation_report()
+            st.success(f"Generated {path}")
+            report_text = path.read_text(encoding="utf-8")
+        else:
+            report_text = generate_evaluation_report()
+    except Exception as exc:
+        render_pipeline_error(exc)
+        return
+
     st.download_button(
         "Download evaluation report",
         data=report_text,
