@@ -176,14 +176,16 @@ Copy environment variables:
 Copy-Item .env.example .env
 ```
 
-Optional LLM agent mode:
+Live LLM agent demo mode:
 
 ```text
-USE_LLM_AGENTS=false
+USE_LLM_AGENTS=true
+OPENAI_API_KEY=your_openai_key
 OPENAI_MODEL=gpt-4o-mini
+LLM_TEMPERATURE=0.2
 ```
 
-The default deterministic mode keeps evaluation reproducible. Set `USE_LLM_AGENTS=true` with `OPENAI_API_KEY` to enable LangChain-backed agent calls.
+The default deterministic mode keeps evaluation reproducible. For a live Agentic AI demo, set `USE_LLM_AGENTS=true` with your local `OPENAI_API_KEY`. In live mode, the Term Extractor, Compliance Checker reviewer note, and Credit Risk Scorer rationale use LangChain model calls. Set `LLM_TEMPERATURE` above `0` when you want to demonstrate non-deterministic language behavior and then use the Drift tab to measure whether outputs change across repeated runs.
 
 Optional LangSmith tracing:
 

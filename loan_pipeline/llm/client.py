@@ -91,7 +91,7 @@ def _invoke_json_prompt(settings: Settings, prompt: str) -> dict[str, Any]:
     llm = ChatOpenAI(
         api_key=settings.openai_api_key,
         model=settings.openai_model,
-        temperature=0,
+        temperature=settings.llm_temperature,
     )
     response = llm.invoke(prompt)
     content = response.content if hasattr(response, "content") else str(response)

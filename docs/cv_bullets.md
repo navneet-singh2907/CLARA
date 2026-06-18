@@ -44,7 +44,7 @@ The evaluation is not a single accuracy number. It includes a 30-case tiered gol
 
 ### What Was The Main Tradeoff?
 
-The default mode is deterministic to keep evaluation reproducible. Optional LLM mode and LangSmith tracing can be enabled, but the core metrics do not depend on external API availability.
+The default mode is deterministic to keep evaluation reproducible. For demos, live LLM agent mode can be enabled with `USE_LLM_AGENTS=true`, `OPENAI_API_KEY`, and `LLM_TEMPERATURE>0`. That lets me show actual model-backed agent behavior while still keeping the gold-set evaluation reproducible when needed.
 
 ### What Would You Build Next?
 

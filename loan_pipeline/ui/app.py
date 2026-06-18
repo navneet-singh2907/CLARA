@@ -64,6 +64,8 @@ def main() -> None:
 
     mode_label = "LLM mode" if settings.use_llm_agents else "Deterministic mode"
     st.sidebar.metric("Agent mode", mode_label)
+    st.sidebar.metric("LLM model", settings.openai_model if settings.use_llm_agents else "Off")
+    st.sidebar.metric("LLM temperature", f"{settings.llm_temperature:.2f}" if settings.use_llm_agents else "Off")
     st.sidebar.metric("LangSmith tracing", "On" if settings.langsmith_tracing else "Off")
     st.sidebar.caption(f"Trace project: {settings.langsmith_project}")
     st.sidebar.metric("Gold set", "30 cases")
@@ -138,11 +140,21 @@ def render_loan_review() -> None:
     st.caption(f"Reviewer policy: {POLICY_PROFILES[packet.review_policy].label}")
 
     st.write(packet.summary)
+    settings = get_settings()
+    if settings.use_llm_agents:
+        st.success(
+            "Live LLM agent mode is active. Term extraction, compliance reviewer notes, "
+            "and risk rationale can use model calls."
+        )
 
     if packet.human_review_notes:
         st.warning("Human review notes")
         for note in packet.human_review_notes:
             st.write(f"- {note}")
+
+    if packet.compliance.reviewer_note:
+        st.subheader("LLM Compliance Reviewer Note")
+        st.write(packet.compliance.reviewer_note)
 
     if packet.contradictions:
         st.subheader("Agent Contradictions")

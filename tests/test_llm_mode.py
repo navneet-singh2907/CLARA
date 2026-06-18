@@ -18,6 +18,17 @@ def test_llm_mode_defaults_off() -> None:
         reset_settings_cache()
 
 
+def test_llm_temperature_is_configurable() -> None:
+    old_value = os.environ.get("LLM_TEMPERATURE")
+    os.environ["LLM_TEMPERATURE"] = "0.7"
+    try:
+        reset_settings_cache()
+        assert get_settings().llm_temperature == 0.7
+    finally:
+        _restore_env("LLM_TEMPERATURE", old_value)
+        reset_settings_cache()
+
+
 def test_deterministic_agents_run_without_api_key_when_llm_mode_off() -> None:
     old_flag = os.environ.get("USE_LLM_AGENTS")
     old_key = os.environ.pop("OPENAI_API_KEY", None)

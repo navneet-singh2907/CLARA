@@ -6,11 +6,16 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from loan_pipeline.graph.state import LoanCase
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = PROJECT_ROOT.parent
 SBA_LOANS_CSV = PROJECT_ROOT / "data" / "sba_loans.csv"
 GOLD_SET_JSON = PROJECT_ROOT / "eval" / "gold_set.json"
+
+load_dotenv(REPO_ROOT / ".env")
 
 
 @dataclass(frozen=True)
@@ -19,6 +24,7 @@ class Settings:
     use_llm_agents: bool
     openai_api_key: str | None
     openai_model: str
+    llm_temperature: float
     langsmith_tracing: bool
     langsmith_project: str
 
@@ -30,6 +36,7 @@ def get_settings() -> Settings:
         use_llm_agents=_env_bool("USE_LLM_AGENTS", default=False),
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        llm_temperature=float(os.getenv("LLM_TEMPERATURE", "0.2")),
         langsmith_tracing=_env_bool("LANGSMITH_TRACING", default=False)
         or _env_bool("LANGCHAIN_TRACING_V2", default=False),
         langsmith_project=os.getenv("LANGSMITH_PROJECT", "loan-review-pipeline"),
