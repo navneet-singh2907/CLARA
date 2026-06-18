@@ -1,8 +1,8 @@
-# Multi-Agent Small Business Loan Review Pipeline
+# CLARA - Credit Loan Analysis & Review Agent
 
 Week 3 project for the Gen Academy Agentic AI Bootcamp.
 
-LangChain + LangGraph + Streamlit system for reviewing small business loan applications with specialist agents, human-in-the-loop audit controls, rigorous evaluation, and exportable review packets.
+CLARA is a LangChain + LangGraph product for reviewing small business loan applications with specialist agents, human-in-the-loop audit controls, rigorous evaluation, and exportable review packets.
 
 ## Portfolio Summary
 

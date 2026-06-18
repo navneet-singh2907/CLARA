@@ -2,15 +2,15 @@
 
 ## Project Title
 
-Multi-Agent Small Business Loan Review Pipeline
+CLARA - Credit Loan Analysis & Review Agent
 
 ## One-Line Summary
 
-Built a LangChain + LangGraph + Streamlit multi-agent loan review system with specialist agents, reviewer policy modes, rigorous evaluation, human override audit logs, LangSmith-compatible tracing, and PDF review packet export.
+Built CLARA, a LangChain + LangGraph multi-agent loan review product with specialist agents, reviewer policy modes, rigorous evaluation, human override audit logs, LangSmith-compatible tracing, and PDF review packet export.
 
 ## Resume Bullets
 
-- Built a multi-agent small business loan review pipeline using LangGraph, LangChain, and Streamlit, coordinating specialist agents for term extraction, compliance review, and credit risk scoring.
+- Built CLARA, a multi-agent small business loan review product using LangGraph, LangChain, and Streamlit, coordinating specialist agents for term extraction, compliance review, and credit risk scoring.
 - Designed a 30-case gold-set evaluation harness split across clean, ambiguous, and adversarial loan applications, with ablation studies, failure categorization, LLM-as-judge scoring, and inter-rater agreement.
 - Implemented responsible-AI controls including contradiction detection, counterfactual explanations, confidence calibration, repeated-run drift detection, human override audit logging, and PDF review packet export.
 - Added configurable reviewer policy modes for SBA reviewer, bank underwriter, and CDFI lender postures, allowing the same loan application to be evaluated under different institutional risk tolerances.
@@ -18,13 +18,13 @@ Built a LangChain + LangGraph + Streamlit multi-agent loan review system with sp
 
 ## Best Three Resume Bullets
 
-- Built a LangGraph multi-agent loan review pipeline with parallel compliance and credit-risk specialist agents, reviewer policy modes, human override audit logs, and PDF review packet export.
+- Built CLARA as a LangGraph multi-agent loan review product with parallel compliance and credit-risk specialist agents, reviewer policy modes, human override audit logs, and PDF review packet export.
 - Designed a 30-case evaluation harness with clean, ambiguous, and adversarial tiers, ablation visualization, failure analysis, LLM-as-judge scaffolding, inter-rater agreement, confidence calibration, and drift detection.
 - Added responsible-AI governance features for high-stakes financial review, including contradiction detection, counterfactual explanations, LangSmith-compatible observability, and auditable human-in-the-loop decisions.
 
 ## LinkedIn / Portfolio Summary
 
-I built a multi-agent small business loan review pipeline using LangGraph, LangChain, and Streamlit. The system reviews SBA-style loan applications through specialist agents for term extraction, compliance checking, and credit risk scoring, then produces an auditable human review packet.
+I built CLARA, a multi-agent small business loan review product using LangGraph, LangChain, and Streamlit. The system reviews SBA-style loan applications through specialist agents for term extraction, compliance checking, and credit risk scoring, then produces an auditable human review packet.
 
 The project emphasizes production-grade AI evaluation and governance: a 30-case gold set, ablation visualization, LLM-as-judge scaffolding, inter-rater agreement, confidence calibration, repeated-run drift detection, contradiction detection, counterfactual explanations, human override audit logs, reviewer policy modes, optional LangSmith tracing, and PDF export.
 

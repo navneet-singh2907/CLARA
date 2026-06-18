@@ -49,7 +49,7 @@ def run_pipeline_with_state(
     review_policy: ReviewPolicy = "sba_reviewer",
 ) -> GraphState:
     return trace_call(
-        name="Loan Review Pipeline",
+        name="CLARA Loan Review Pipeline",
         run_type="chain",
         func=_run_pipeline_with_state,
         args=(loan_case, review_policy),

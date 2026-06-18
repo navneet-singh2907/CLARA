@@ -1,24 +1,86 @@
 """FastAPI entrypoint for SSE streaming endpoints."""
 
-from fastapi import FastAPI, Query
+import hashlib
+import io
+import re
+from dataclasses import asdict
+from typing import Any
+
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from pydantic import BaseModel, Field
 
 from loan_pipeline.api.streaming import (
     stream_evaluation_events,
     stream_judge_agreement_events,
     stream_review_events,
 )
-from loan_pipeline.config import load_sba_demo_cases
-from loan_pipeline.graph.state import ReviewPolicy
+from loan_pipeline.config import load_sba_demo_cases, offline_evaluation_context
+from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
+from loan_pipeline.eval.drift import run_drift_study
+from loan_pipeline.eval.inter_rater import run_inter_rater_report, run_packet_inter_rater_report
+from loan_pipeline.eval.report import generate_evaluation_report
+from loan_pipeline.eval.report_pdf import build_evaluation_report_pdf
+from loan_pipeline.eval.run_eval import run_eval
+from loan_pipeline.graph.orchestrator import run_pipeline
+from loan_pipeline.graph.state import LoanCase, ReviewPolicy
+from loan_pipeline.llm.client import parse_document_to_loan_case
+from loan_pipeline.review.pdf_export import build_review_packet_pdf
 
 app = FastAPI(
-    title="Loan Review Pipeline API",
+    title="CLARA API",
     version="0.1.0",
-    description="SSE endpoints for observing LangGraph loan review agents and evaluation runs.",
+    description="SSE endpoints for observing CLARA loan review agents and evaluation runs.",
 )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+
+class AuditEntryPayload(BaseModel):
+    target: str
+    decision: str
+    reviewer: str
+    rationale: str
+    createdAt: str
+
+
+class LoanCasePayload(BaseModel):
+    case_id: str
+    borrower_name: str
+    industry: str
+    naics_code: str
+    loan_amount: float
+    sba_guaranteed_amount: float
+    term_months: int
+    jobs_supported: int
+    borrower_credit_score: int | None = None
+    years_in_business: float | None = None
+    prior_default: bool = False
+    missing_documents: list[str] = Field(default_factory=list)
+    notes: str = ""
+    difficulty_tier: str = "uploaded"
+
+
+class ReviewPdfRequest(BaseModel):
+    case_id: str | None = None
+    policy: ReviewPolicy = "sba_reviewer"
+    loan_case: LoanCasePayload | None = None
+    audit_entries: list[AuditEntryPayload] = Field(default_factory=list)
 
 CASE_ID_QUERY = Query(..., description="Gold-set case ID, for example ADV-001.")
 POLICY_QUERY = Query("sba_reviewer", description="Reviewer policy profile.")
+DOCUMENT_FILE = File(...)
+DOCUMENT_POLICY = Form("sba_reviewer")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -28,7 +90,7 @@ def root() -> str:
     <html lang="en">
       <head>
         <meta charset="utf-8" />
-        <title>Loan Review Pipeline API</title>
+        <title>CLARA API</title>
         <style>
           body { font-family: Arial, sans-serif; max-width: 880px; margin: 48px auto; line-height: 1.5; }
           code, pre { background: #f4f4f4; border-radius: 6px; padding: 2px 6px; }
@@ -37,8 +99,8 @@ def root() -> str:
         </style>
       </head>
       <body>
-        <h1>Loan Review Pipeline API</h1>
-        <p>This FastAPI backend streams LangGraph loan-review events with Server-Sent Events.</p>
+        <h1>CLARA API</h1>
+        <p>Credit Loan Analysis & Review Agent backend for streaming LangGraph loan-review events with Server-Sent Events.</p>
         <h2>Quick Checks</h2>
         <ul>
           <li><a href="/health">/health</a></li>
@@ -86,11 +148,238 @@ def review_stream(
     )
 
 
+@app.post("/review/pdf")
+def review_pdf(request: ReviewPdfRequest) -> Response:
+    if request.loan_case:
+        loan_case = _loan_case_from_payload(request.loan_case)
+    else:
+        cases_by_id = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
+        loan_case = cases_by_id.get(request.case_id or "")
+        if loan_case is None:
+            return Response(f"Unknown case_id: {request.case_id}", status_code=404)
+
+    packet = run_pipeline(loan_case, review_policy=request.policy)
+    audit_log = [_audit_entry_to_pdf_row(entry) for entry in request.audit_entries]
+    pdf_bytes = build_review_packet_pdf(packet, audit_log=audit_log)
+    headers = {
+        "Content-Disposition": f'attachment; filename="loan_review_packet_{loan_case.case_id}.pdf"'
+    }
+    return Response(pdf_bytes, media_type="application/pdf", headers=headers)
+
+
+@app.post("/review/document")
+async def review_document(
+    file: UploadFile = DOCUMENT_FILE,
+    policy: ReviewPolicy = DOCUMENT_POLICY,
+) -> dict[str, Any]:
+    document_text = await _extract_upload_text(file)
+    if not document_text.strip():
+        raise HTTPException(status_code=400, detail="Uploaded document did not contain extractable text.")
+
+    loan_case = _parse_uploaded_loan_case(document_text)
+    packet = run_pipeline(loan_case, review_policy=policy)
+    return {
+        "file_name": file.filename,
+        "characters_extracted": len(document_text),
+        "loan_case": _loan_case_to_payload(loan_case),
+        "case": _loan_case_summary(loan_case),
+        "audit_targets": _review_packet_audit_targets(packet),
+        "packet": {
+            "case_id": packet.case_id,
+            "outcome": packet.recommended_outcome,
+            "risk": packet.risk.band,
+            "compliance": packet.compliance.status,
+            "escalation_required": packet.escalation_required,
+            "summary": packet.summary,
+            "risk_rationale": packet.risk.rationale,
+            "compliance_findings": [asdict(finding) for finding in packet.compliance.findings],
+            "counterfactuals": [asdict(item) for item in packet.counterfactuals],
+            "contradictions": [asdict(item) for item in packet.contradictions],
+        },
+    }
+
+
 @app.get("/evaluation/stream")
 def evaluation_stream() -> StreamingResponse:
     return StreamingResponse(stream_evaluation_events(), media_type="text/event-stream")
 
 
+@app.get("/evaluation")
+def evaluation() -> dict:
+    return run_eval()
+
+
+@app.get("/ablation")
+def ablation() -> list[dict]:
+    return summarize_ablation_table(run_ablation_study())
+
+
+@app.get("/drift")
+def drift(repeats: int = Query(5, ge=2, le=10)) -> dict:
+    return run_drift_study(repeats=repeats)
+
+
 @app.get("/judge-agreement/stream")
 def judge_agreement_stream() -> StreamingResponse:
     return StreamingResponse(stream_judge_agreement_events(), media_type="text/event-stream")
+
+
+@app.get("/judge-agreement")
+def judge_agreement() -> dict:
+    return run_inter_rater_report()
+
+
+@app.post("/judge-agreement/packet")
+async def judge_agreement_packet(file: UploadFile = DOCUMENT_FILE) -> dict[str, Any]:
+    packet_text = await _extract_upload_text(file)
+    if not packet_text.strip():
+        raise HTTPException(status_code=400, detail="Uploaded packet did not contain extractable text.")
+    return run_packet_inter_rater_report(
+        packet_text=packet_text,
+        artifact_name=file.filename or "uploaded_packet.pdf",
+    )
+
+
+@app.get("/report")
+def report() -> Response:
+    with offline_evaluation_context():
+        report_text = generate_evaluation_report()
+    return Response(report_text, media_type="text/markdown")
+
+
+@app.get("/report/pdf")
+def report_pdf() -> Response:
+    with offline_evaluation_context():
+        pdf_bytes = build_evaluation_report_pdf()
+    headers = {"Content-Disposition": 'attachment; filename="evaluation_report.pdf"'}
+    return Response(pdf_bytes, media_type="application/pdf", headers=headers)
+
+
+def _audit_entry_to_pdf_row(entry: AuditEntryPayload) -> dict[str, Any]:
+    return {
+        "target_type": "UI_OVERRIDE",
+        "target_id": entry.target,
+        "override_decision": entry.decision,
+        "rationale": entry.rationale,
+        "reviewer": entry.reviewer,
+        "created_at": entry.createdAt,
+    }
+
+
+def _loan_case_from_payload(payload: LoanCasePayload) -> LoanCase:
+    return LoanCase(**payload.model_dump())
+
+
+def _loan_case_to_payload(loan_case: LoanCase) -> dict[str, Any]:
+    return asdict(loan_case)
+
+
+def _loan_case_summary(loan_case: LoanCase) -> dict[str, Any]:
+    return {
+        "case_id": loan_case.case_id,
+        "borrower_name": loan_case.borrower_name,
+        "industry": loan_case.industry,
+        "loan_amount": loan_case.loan_amount,
+        "term_months": loan_case.term_months,
+        "credit_score": loan_case.borrower_credit_score,
+        "missing_documents": loan_case.missing_documents,
+    }
+
+
+def _review_packet_audit_targets(packet) -> list[str]:
+    targets = [
+        f"Outcome - {packet.recommended_outcome}",
+        f"Risk band - {packet.risk.band}",
+        f"Compliance status - {packet.compliance.status}",
+    ]
+    targets.extend(
+        f"Compliance {finding.rule_id} - {finding.severity}"
+        for finding in packet.compliance.findings
+    )
+    targets.extend(
+        f"Contradiction {index} - {item.title}"
+        for index, item in enumerate(packet.contradictions, start=1)
+    )
+    targets.extend(
+        f"Counterfactual {index} - {item.title}"
+        for index, item in enumerate(packet.counterfactuals, start=1)
+    )
+    return targets
+
+
+async def _extract_upload_text(file: UploadFile) -> str:
+    content = await file.read()
+    file_name = (file.filename or "").lower()
+    if file_name.endswith(".pdf") or file.content_type == "application/pdf":
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+    return content.decode("utf-8", errors="ignore")
+
+
+def _parse_uploaded_loan_case(document_text: str) -> LoanCase:
+    try:
+        return parse_document_to_loan_case(document_text)
+    except Exception:
+        return _parse_uploaded_loan_case_fallback(document_text)
+
+
+def _parse_uploaded_loan_case_fallback(document_text: str) -> LoanCase:
+    case_id = "DOC-" + hashlib.sha256(document_text.encode()).hexdigest()[:8].upper()
+    borrower = _match_text(document_text, r"(?:borrower|business|company)\s*[:\-]\s*([^\n]+)")
+    industry = _match_text(document_text, r"industry\s*[:\-]\s*([^\n]+)")
+    naics = _match_text(document_text, r"naics\s*[:\-]\s*(\d{6})") or "000000"
+    loan_amount = _match_money(document_text, r"loan(?: amount)?\s*[:\-]\s*\$?([\d,]+(?:\.\d+)?)")
+    guaranteed = _match_money(
+        document_text,
+        r"(?:sba guarantee|guaranteed amount)\s*[:\-]\s*\$?([\d,]+(?:\.\d+)?)",
+    )
+    term = _match_int(document_text, r"term\s*[:\-]\s*(\d+)")
+    jobs = _match_int(document_text, r"jobs(?: supported)?\s*[:\-]\s*(\d+)")
+    credit_score = _match_int(document_text, r"credit score\s*[:\-]\s*(\d+)")
+    years = _match_float(document_text, r"years in business\s*[:\-]\s*(\d+(?:\.\d+)?)")
+    prior_default = bool(re.search(r"prior default\s*[:\-]\s*(true|yes)", document_text, re.I))
+    missing_raw = _match_text(document_text, r"missing documents\s*[:\-]\s*([^\n]+)")
+    missing_documents = [
+        item.strip()
+        for item in re.split(r"[,|]", missing_raw or "")
+        if item.strip() and item.strip().lower() != "none"
+    ]
+
+    return LoanCase(
+        case_id=case_id,
+        borrower_name=borrower or "Uploaded Borrower",
+        industry=industry or "Uploaded loan application",
+        naics_code=naics,
+        loan_amount=loan_amount,
+        sba_guaranteed_amount=guaranteed,
+        term_months=term,
+        jobs_supported=jobs,
+        borrower_credit_score=credit_score,
+        years_in_business=years,
+        prior_default=prior_default,
+        missing_documents=missing_documents,
+        notes="Parsed from uploaded document with deterministic fallback extraction.",
+        difficulty_tier="uploaded",
+    )
+
+
+def _match_text(text: str, pattern: str) -> str:
+    match = re.search(pattern, text, re.I)
+    return match.group(1).strip() if match else ""
+
+
+def _match_money(text: str, pattern: str) -> float:
+    value = _match_text(text, pattern).replace(",", "")
+    return float(value) if value else 0.0
+
+
+def _match_int(text: str, pattern: str) -> int:
+    value = _match_text(text, pattern)
+    return int(value) if value else 0
+
+
+def _match_float(text: str, pattern: str) -> float | None:
+    value = _match_text(text, pattern)
+    return float(value) if value else None

@@ -5,7 +5,7 @@ from queue import Queue
 from threading import Thread
 from typing import Any, Iterable
 
-from loan_pipeline.config import load_sba_demo_cases
+from loan_pipeline.config import get_settings, load_sba_demo_cases
 from loan_pipeline.eval.inter_rater import run_inter_rater_report
 from loan_pipeline.eval.run_eval import load_gold_labels, run_eval
 from loan_pipeline.graph.orchestrator import build_review_graph
@@ -126,11 +126,46 @@ def stream_evaluation_events() -> Iterable[str]:
 
 def stream_judge_agreement_events() -> Iterable[str]:
     total_cases = len(load_gold_labels())
+    settings = get_settings()
+    primary_model = settings.primary_judge_model or "local primary judge"
+    secondary_model = settings.secondary_judge_model or "local strict secondary judge"
     yield sse_event("run_started", {"run_type": "judge_agreement", "total_cases": total_cases})
+    yield sse_event(
+        "judge_activity",
+        {
+            "step": "judge_pair_configured",
+            "message": "Configured independent primary and secondary judge models.",
+            "primary_judge": primary_model,
+            "secondary_judge": secondary_model,
+        },
+    )
+    yield sse_event(
+        "judge_activity",
+        {
+            "step": "gold_set_queued",
+            "message": f"Queued {total_cases} gold-set cases for pairwise judging.",
+            "total_cases": total_cases,
+        },
+    )
 
     event_queue: Queue[str | None] = Queue()
 
     def emit_progress(completed: int, total: int, case_id: str) -> None:
+        event_queue.put(
+            sse_event(
+                "judge_activity",
+                {
+                    "step": "case_scored",
+                    "message": (
+                        f"Primary and secondary judges finished scoring {case_id}; "
+                        "agreement deltas will be computed after all cases finish."
+                    ),
+                    "case_id": case_id,
+                    "completed": completed,
+                    "total": total,
+                },
+            )
+        )
         event_queue.put(
             sse_event(
                 "progress",
@@ -141,6 +176,21 @@ def stream_judge_agreement_events() -> Iterable[str]:
     def worker() -> None:
         try:
             result = run_inter_rater_report(progress_callback=emit_progress)
+            event_queue.put(
+                sse_event(
+                    "judge_activity",
+                    {
+                        "step": "agreement_computed",
+                        "message": (
+                            "Computed exact agreement, within-one-point agreement, "
+                            "score deltas, and manual spot-check cases."
+                        ),
+                        "exact_agreement": result["exact_agreement"],
+                        "within_one_point_agreement": result["within_one_point_agreement"],
+                        "disagreement_case_count": result["disagreement_case_count"],
+                    },
+                )
+            )
             event_queue.put(
                 sse_event(
                     "run_completed",

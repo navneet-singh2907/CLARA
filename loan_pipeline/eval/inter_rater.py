@@ -10,7 +10,9 @@ from loan_pipeline.eval.judge import (
     JUDGE_DIMENSIONS,
     JudgeScore,
     run_configured_primary_judge,
+    run_configured_primary_packet_judge,
     run_configured_secondary_judge,
+    run_configured_secondary_packet_judge,
 )
 from loan_pipeline.eval.metrics import GoldLabel
 from loan_pipeline.eval.run_eval import load_gold_labels
@@ -145,6 +147,35 @@ def summarize_inter_rater_agreement(pair_scores: list[JudgePairScore]) -> dict[s
             case["case_id"] for case in disagreement_cases if case["manual_spot_check_required"]
         ],
         "disagreement_cases": disagreement_cases,
+    }
+
+
+def run_packet_inter_rater_report(packet_text: str, artifact_name: str = "uploaded_packet.pdf") -> dict[str, Any]:
+    primary = run_configured_primary_packet_judge(packet_text)
+    secondary = run_configured_secondary_packet_judge(packet_text)
+    dimension_deltas = {
+        dimension: abs(getattr(primary, dimension) - getattr(secondary, dimension))
+        for dimension in JUDGE_DIMENSIONS
+    }
+    comparisons = list(dimension_deltas.values())
+    return {
+        "artifact_name": artifact_name,
+        "characters_extracted": len(packet_text),
+        "cases": 1,
+        "dimensions_per_case": len(JUDGE_DIMENSIONS),
+        "primary": primary.to_dict(),
+        "secondary": secondary.to_dict(),
+        "primary_judge_summary": summarize_judge_scores([primary]),
+        "secondary_judge_summary": summarize_judge_scores([secondary]),
+        "exact_agreement": _ratio(delta == 0 for delta in comparisons),
+        "within_one_point_agreement": _ratio(delta <= 1 for delta in comparisons),
+        "average_score_delta": round(sum(comparisons) / len(comparisons), 4),
+        "highest_disagreement_dimension": max(dimension_deltas, key=dimension_deltas.get),
+        "disagreement_case_count": 1 if any(delta > 0 for delta in comparisons) else 0,
+        "dimension_deltas": dimension_deltas,
+        "manual_spot_check_cases": [
+            artifact_name
+        ] if any(delta > 0 for delta in comparisons) else [],
     }
 
 

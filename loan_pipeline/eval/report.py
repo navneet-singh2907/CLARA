@@ -36,7 +36,7 @@ def generate_evaluation_report(
         stage_callback("render_report")
 
     sections = [
-        "# Small Business Loan Review Pipeline Evaluation Report",
+        "# CLARA Evaluation Report",
         _executive_summary(eval_result, inter_rater),
         _baseline_metrics(eval_result),
         _observability(),

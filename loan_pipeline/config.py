@@ -2,9 +2,11 @@
 
 import csv
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from typing import Iterator
 
 from dotenv import load_dotenv
 
@@ -62,6 +64,34 @@ def get_settings() -> Settings:
 
 def reset_settings_cache() -> None:
     get_settings.cache_clear()
+
+
+@contextmanager
+def offline_evaluation_context() -> Iterator[None]:
+    """Temporarily disable live model/tracing calls for reproducible batch artifacts."""
+    env_names = [
+        "USE_LLM_AGENTS",
+        "PRIMARY_JUDGE_MODEL",
+        "SECONDARY_JUDGE_MODEL",
+        "LANGSMITH_TRACING",
+        "LANGCHAIN_TRACING_V2",
+    ]
+    previous_values = {name: os.environ.get(name) for name in env_names}
+    os.environ["USE_LLM_AGENTS"] = "false"
+    os.environ["PRIMARY_JUDGE_MODEL"] = ""
+    os.environ["SECONDARY_JUDGE_MODEL"] = ""
+    os.environ["LANGSMITH_TRACING"] = "false"
+    os.environ["LANGCHAIN_TRACING_V2"] = "false"
+    reset_settings_cache()
+    try:
+        yield
+    finally:
+        for name, value in previous_values.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        reset_settings_cache()
 
 
 def load_sba_demo_cases(path: Path = SBA_LOANS_CSV) -> list[LoanCase]:

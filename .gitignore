@@ -11,3 +11,6 @@ output/
 tmp/
 loan_pipeline/data/*.local.csv
 loan_pipeline/data/*.downloaded.csv
+web/node_modules/
+web/.next/
+web/out/

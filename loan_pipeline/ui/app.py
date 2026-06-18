@@ -31,7 +31,7 @@ from loan_pipeline.review.pdf_export import build_review_packet_pdf, write_revie
 from loan_pipeline.review.policies import POLICY_PROFILES
 
 st.set_page_config(
-    page_title="Small Business Loan Review",
+    page_title="CLARA",
     layout="wide",
 )
 
@@ -314,7 +314,7 @@ def render_live_batch_option(action_label: str, key: str, detail: str) -> bool:
 def main() -> None:
     settings = get_settings()
 
-    st.title("Small Business Loan Application Review Pipeline")
+    st.title("CLARA - Credit Loan Analysis & Review Agent")
     st.caption("LangChain + LangGraph + Streamlit | SBA-style data | 30-case gold set")
 
     mode_label = "LLM mode" if settings.use_llm_agents else "Deterministic mode"
