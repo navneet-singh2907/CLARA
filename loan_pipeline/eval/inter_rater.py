@@ -3,7 +3,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from loan_pipeline.config import load_sba_demo_cases
 from loan_pipeline.eval.judge import (
@@ -16,6 +16,8 @@ from loan_pipeline.eval.metrics import GoldLabel
 from loan_pipeline.eval.run_eval import load_gold_labels
 from loan_pipeline.graph.orchestrator import run_pipeline
 from loan_pipeline.graph.state import LoanCase
+
+ProgressCallback = Callable[[int, int, str], None]
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,7 @@ def run_inter_rater_report(
     case_limit: int | None = None,
     case_ids: list[str] | None = None,
     max_workers: int = 8,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
     labels = load_gold_labels()
@@ -52,6 +55,8 @@ def run_inter_rater_report(
 
     pair_scores: list[JudgePairScore] = []
     errors: list[str] = []
+    total_cases = len(labels)
+    completed_cases = 0
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
@@ -64,6 +69,9 @@ def run_inter_rater_report(
                 pair_scores.append(future.result())
             except Exception as exc:
                 errors.append(f"{label.case_id}: {exc}")
+            completed_cases += 1
+            if progress_callback:
+                progress_callback(completed_cases, total_cases, label.case_id)
 
     pair_scores.sort(key=lambda score: label_order[score.case_id])
     result = summarize_inter_rater_agreement(pair_scores)

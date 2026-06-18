@@ -46,6 +46,21 @@ def cached_eval() -> dict:
     return run_eval()
 
 
+def run_eval_with_progress() -> dict:
+    progress_bar = st.progress(0)
+    status = st.empty()
+
+    def update(completed: int, total: int, case_id: str) -> None:
+        ratio = completed / total if total else 1
+        progress_bar.progress(min(1.0, ratio))
+        if completed >= total:
+            status.write("Completed live evaluation for all 30 cases.")
+        else:
+            status.write(f"Running live evaluation: {completed}/{total} complete. Current: {case_id}")
+
+    return run_eval(progress_callback=update)
+
+
 @st.cache_data(show_spinner=False)
 def cached_offline_eval() -> dict:
     with deterministic_batch_context():
@@ -66,6 +81,62 @@ def cached_offline_ablation_table() -> list[dict]:
 @st.cache_data(show_spinner=False)
 def cached_inter_rater() -> dict:
     return run_inter_rater_report()
+
+
+def run_inter_rater_with_progress() -> dict:
+    progress_bar = st.progress(0)
+    status = st.empty()
+
+    def update(completed: int, total: int, case_id: str) -> None:
+        ratio = completed / total if total else 1
+        progress_bar.progress(min(1.0, ratio))
+        status.write(f"Live judge agreement: {completed}/{total} cases complete. Latest: {case_id}")
+
+    return run_inter_rater_report(progress_callback=update)
+
+
+def write_live_report_with_progress() -> Path:
+    stage_progress = st.progress(0)
+    stage_status = st.empty()
+    case_progress = st.progress(0)
+    case_status = st.empty()
+    stage_weights = {
+        "evaluation": 0.05,
+        "ablation": 0.45,
+        "drift": 0.60,
+        "judge_agreement": 0.75,
+        "render_report": 0.95,
+    }
+    stage_labels = {
+        "evaluation": "Running 30-case live evaluation",
+        "ablation": "Running ablation study",
+        "drift": "Running drift analysis",
+        "judge_agreement": "Running 30-case primary/secondary judge agreement",
+        "render_report": "Rendering Markdown report",
+    }
+
+    def update_stage(stage: str) -> None:
+        stage_progress.progress(stage_weights.get(stage, 0.0))
+        stage_status.write(stage_labels.get(stage, stage))
+
+    def update_eval(completed: int, total: int, case_id: str) -> None:
+        ratio = completed / total if total else 1
+        case_progress.progress(min(1.0, ratio))
+        case_status.write(f"Evaluation: {completed}/{total} cases complete. Current: {case_id}")
+
+    def update_judge(completed: int, total: int, case_id: str) -> None:
+        ratio = completed / total if total else 1
+        case_progress.progress(min(1.0, ratio))
+        case_status.write(f"Judge agreement: {completed}/{total} cases complete. Latest: {case_id}")
+
+    path = write_evaluation_report(
+        eval_progress_callback=update_eval,
+        inter_rater_progress_callback=update_judge,
+        stage_callback=update_stage,
+    )
+    stage_progress.progress(1.0)
+    stage_status.write("Full live report generated.")
+    return path
 
 
 @st.cache_data(show_spinner=False)
@@ -602,7 +673,12 @@ def render_evaluation_dashboard() -> None:
     )
 
     try:
-        result = cached_eval() if run_live or not live_model_mode_enabled() else cached_offline_eval()
+        if run_live:
+            result = run_eval_with_progress()
+        elif not live_model_mode_enabled():
+            result = cached_eval()
+        else:
+            result = cached_offline_eval()
     except Exception as exc:
         render_pipeline_error(exc)
         return
@@ -809,8 +885,7 @@ def render_judge_dashboard() -> None:
 
     try:
         if run_live:
-            with st.spinner("Running live primary/secondary judge agreement across all 30 cases..."):
-                inter_rater = cached_inter_rater()
+            inter_rater = run_inter_rater_with_progress()
             judge_summary = inter_rater["primary_judge_summary"]
             judge_summary_label = "Live Primary Judge Summary"
             settings = get_settings()
@@ -885,7 +960,7 @@ def render_report_dashboard() -> None:
 
     try:
         if run_live or not live_mode:
-            path = write_evaluation_report()
+            path = write_live_report_with_progress() if run_live else write_evaluation_report()
             st.success(f"Generated {path}")
             report_text = path.read_text(encoding="utf-8")
         else:

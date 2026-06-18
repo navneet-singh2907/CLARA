@@ -1,7 +1,7 @@
 """Generate a Markdown evaluation report."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from loan_pipeline.config import load_sba_demo_cases
 from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
@@ -11,13 +11,29 @@ from loan_pipeline.eval.run_eval import run_eval
 from loan_pipeline.graph.orchestrator import run_pipeline_with_state
 
 REPORT_PATH = Path("reports") / "evaluation_report.md"
+ProgressCallback = Callable[[int, int, str], None]
+StageCallback = Callable[[str], None]
 
 
-def generate_evaluation_report() -> str:
-    eval_result = run_eval()
+def generate_evaluation_report(
+    eval_progress_callback: ProgressCallback | None = None,
+    inter_rater_progress_callback: ProgressCallback | None = None,
+    stage_callback: StageCallback | None = None,
+) -> str:
+    if stage_callback:
+        stage_callback("evaluation")
+    eval_result = run_eval(progress_callback=eval_progress_callback)
+    if stage_callback:
+        stage_callback("ablation")
     ablation_rows = summarize_ablation_table(run_ablation_study())
+    if stage_callback:
+        stage_callback("drift")
     drift_result = run_drift_study()
-    inter_rater = run_inter_rater_report()
+    if stage_callback:
+        stage_callback("judge_agreement")
+    inter_rater = run_inter_rater_report(progress_callback=inter_rater_progress_callback)
+    if stage_callback:
+        stage_callback("render_report")
 
     sections = [
         "# Small Business Loan Review Pipeline Evaluation Report",
@@ -41,9 +57,21 @@ def generate_evaluation_report() -> str:
     return "\n\n".join(sections) + "\n"
 
 
-def write_evaluation_report(path: Path = REPORT_PATH) -> Path:
+def write_evaluation_report(
+    path: Path = REPORT_PATH,
+    eval_progress_callback: ProgressCallback | None = None,
+    inter_rater_progress_callback: ProgressCallback | None = None,
+    stage_callback: StageCallback | None = None,
+) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(generate_evaluation_report(), encoding="utf-8")
+    path.write_text(
+        generate_evaluation_report(
+            eval_progress_callback=eval_progress_callback,
+            inter_rater_progress_callback=inter_rater_progress_callback,
+            stage_callback=stage_callback,
+        ),
+        encoding="utf-8",
+    )
     return path
 
 

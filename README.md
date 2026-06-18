@@ -6,9 +6,9 @@ LangChain + LangGraph + Streamlit system for reviewing small business loan appli
 
 ## Portfolio Summary
 
-This project treats agentic AI as a high-stakes financial decision-support workflow rather than a simple automation demo. A LangGraph orchestrator coordinates specialist agents for term extraction, compliance review, and credit risk scoring. The system then surfaces contradictions, generates counterfactual explanations, supports reviewer policy modes, logs human overrides, exports a PDF review packet, and evaluates performance against a structured 30-case gold set.
+This project treats agentic AI as a high-stakes financial decision-support workflow rather than a simple automation demo. A LangGraph orchestrator coordinates specialist agents for term extraction, compliance review, and credit risk scoring. The system then surfaces contradictions, generates counterfactual explanations, supports reviewer policy modes, logs human overrides, exports a PDF review packet, and evaluates performance against a structured 30-case SBA-style gold set.
 
-Default mode is deterministic so evaluation is reproducible. Optional LangChain-backed LLM mode and LangSmith tracing can be enabled through environment configuration.
+Default mode is deterministic so evaluation is reproducible. Live LangChain-backed LLM mode is the differentiator for the Agentic AI demo: it routes agents and judge models through an OpenAI-compatible provider such as Nebius, displays live per-case progress for long 30-case runs, and can emit LangSmith traces for observability.
 
 ## Why It Matters
 
@@ -26,10 +26,12 @@ Loan review decisions can affect whether a small business receives capital, surv
 - LangSmith-compatible optional tracing
 - 30-case gold-set evaluation with clean, ambiguous, and adversarial tiers
 - Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, drift detection, and confidence calibration
+- Per-case progress indicators for full live 30-case evaluation and judge runs
+- GitHub Actions CI for lint, compile, and tests
 
 ## Results Snapshot
 
-Current deterministic evaluation results:
+Current deterministic evaluation results on the controlled SBA-style gold set:
 
 | Metric | Result |
 | --- | ---: |
@@ -41,8 +43,11 @@ Current deterministic evaluation results:
 | Risk confidence expected calibration error | 17.00% |
 | Test suite | 61 passing tests |
 
-The deterministic gold-set benchmark currently passes all labeled cases after adversarial risk
-threshold tuning. Confidence calibration remains visible as a separate quality signal.
+The deterministic benchmark is intentionally controlled: it validates orchestration, scoring contracts, ablations, and UI behavior against a stable 30-case set. The live LLM mode is where non-deterministic agent behavior, primary/secondary judge disagreement, and LangSmith traceability become visible. Confidence calibration remains visible as a separate quality signal even when label accuracy is high.
+
+## Data Scope
+
+The checked-in data is a curated SBA-style seed set, not a full production SBA corpus. It is designed for reproducible evaluation and contains clean, ambiguous, and adversarial cases with hand-authored labels. The project includes a public SBA FOIA loader scaffold in `loan_pipeline/data/load_sba_public.py`; expanding the gold set from downloaded SBA Open Data exports is the strongest v2 improvement.
 
 ## Architecture Diagram
 

@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from loan_pipeline.config import GOLD_SET_JSON, load_sba_demo_cases
 from loan_pipeline.eval.calibration import risk_calibration_points, summarize_confidence_calibration
@@ -10,17 +10,25 @@ from loan_pipeline.eval.judge import run_configured_primary_judge
 from loan_pipeline.eval.metrics import GoldLabel, score_case, summarize_scores
 from loan_pipeline.graph.orchestrator import run_pipeline
 
+ProgressCallback = Callable[[int, int, str], None]
 
-def run_eval(gold_path: Path = GOLD_SET_JSON) -> dict[str, Any]:
+
+def run_eval(
+    gold_path: Path = GOLD_SET_JSON,
+    progress_callback: ProgressCallback | None = None,
+) -> dict[str, Any]:
     cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
     gold_labels = load_gold_labels(gold_path)
+    total_cases = len(gold_labels)
 
     scores = []
     judge_scores = []
     failures = []
     failure_counts: dict[str, int] = {}
     packets_by_case = {}
-    for label in gold_labels:
+    for index, label in enumerate(gold_labels, start=1):
+        if progress_callback:
+            progress_callback(index - 1, total_cases, label.case_id)
         loan_case = cases[label.case_id]
         packet = run_pipeline(loan_case)
         packets_by_case[label.case_id] = packet
@@ -51,6 +59,9 @@ def run_eval(gold_path: Path = GOLD_SET_JSON) -> dict[str, Any]:
                     "outcome_correct": score.outcome_correct,
                 }
             )
+
+    if progress_callback:
+        progress_callback(total_cases, total_cases, "complete")
 
     return {
         "summary": summarize_scores(scores),

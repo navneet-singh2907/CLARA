@@ -23,3 +23,14 @@ loan_pipeline/data/foia_7a_2020_present.downloaded.csv
 
 Files matching `*.downloaded.csv` and `*.local.csv` are ignored by Git.
 
+## Recommended V2 Upgrade
+
+For a stronger CV artifact, use the loader to create a second public-data-derived evaluation set:
+
+- Download a recent SBA 7(a) FOIA export.
+- Normalize it with `load_sba_public.py`.
+- Select a balanced sample across approval size, industry, jobs supported, and outcome/default signals.
+- Preserve missing underwriting fields as missing instead of inventing them.
+- Hand-label the final cases before adding them to the gold set.
+
+The existing 30-case set should remain as the stable regression benchmark.
