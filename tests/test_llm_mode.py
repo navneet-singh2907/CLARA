@@ -29,6 +29,26 @@ def test_llm_temperature_is_configurable() -> None:
         reset_settings_cache()
 
 
+def test_live_judge_models_are_configurable() -> None:
+    old_primary = os.environ.get("PRIMARY_JUDGE_MODEL")
+    old_secondary = os.environ.get("SECONDARY_JUDGE_MODEL")
+    old_temperature = os.environ.get("JUDGE_TEMPERATURE")
+    os.environ["PRIMARY_JUDGE_MODEL"] = "gpt-4o-mini"
+    os.environ["SECONDARY_JUDGE_MODEL"] = "gpt-4o-mini"
+    os.environ["JUDGE_TEMPERATURE"] = "0.6"
+    try:
+        reset_settings_cache()
+        settings = get_settings()
+        assert settings.primary_judge_model == "gpt-4o-mini"
+        assert settings.secondary_judge_model == "gpt-4o-mini"
+        assert settings.judge_temperature == 0.6
+    finally:
+        _restore_env("PRIMARY_JUDGE_MODEL", old_primary)
+        _restore_env("SECONDARY_JUDGE_MODEL", old_secondary)
+        _restore_env("JUDGE_TEMPERATURE", old_temperature)
+        reset_settings_cache()
+
+
 def test_deterministic_agents_run_without_api_key_when_llm_mode_off() -> None:
     old_flag = os.environ.get("USE_LLM_AGENTS")
     old_key = os.environ.pop("OPENAI_API_KEY", None)

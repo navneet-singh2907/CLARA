@@ -19,6 +19,9 @@ $env:USE_LLM_AGENTS="true"
 $env:OPENAI_API_KEY="your_openai_key"
 $env:OPENAI_MODEL="gpt-4o-mini"
 $env:LLM_TEMPERATURE="0.2"
+$env:PRIMARY_JUDGE_MODEL="gpt-4o-mini"
+$env:SECONDARY_JUDGE_MODEL="gpt-4o-mini"
+$env:JUDGE_TEMPERATURE="0.2"
 $env:LANGSMITH_TRACING="true"
 $env:LANGSMITH_API_KEY="your_langsmith_key"
 $env:LANGSMITH_PROJECT="loan-review-pipeline"
@@ -37,6 +40,8 @@ Show the sidebar:
 - Agent mode: LLM mode
 - LLM model
 - LLM temperature
+- Primary judge
+- Secondary judge
 - LangSmith tracing status
 
 ### 2. Open With The Stakes

@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from loan_pipeline.config import load_sba_demo_cases
-from loan_pipeline.eval.judge import JUDGE_DIMENSIONS, JudgeScore, run_local_judge, run_strict_local_judge
+from loan_pipeline.eval.judge import (
+    JUDGE_DIMENSIONS,
+    JudgeScore,
+    run_configured_primary_judge,
+    run_configured_secondary_judge,
+)
 from loan_pipeline.eval.run_eval import load_gold_labels
 from loan_pipeline.graph.orchestrator import run_pipeline
 
@@ -30,8 +35,8 @@ def run_inter_rater_report() -> dict[str, Any]:
             JudgePairScore(
                 case_id=loan_case.case_id,
                 tier=label.tier,
-                primary=run_local_judge(loan_case, packet, label),
-                secondary=run_strict_local_judge(loan_case, packet, label),
+                primary=run_configured_primary_judge(loan_case, packet, label),
+                secondary=run_configured_secondary_judge(loan_case, packet, label),
             )
         )
 

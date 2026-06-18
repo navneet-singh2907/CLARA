@@ -4,6 +4,7 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from loan_pipeline.config import get_settings
 from loan_pipeline.eval.metrics import GoldLabel
 from loan_pipeline.graph.state import LoanCase, ReviewPacket
 
@@ -89,6 +90,52 @@ def parse_judge_response(raw_response: str) -> JudgeScore:
     return validate_judge_payload(payload)
 
 
+def run_configured_primary_judge(
+    loan_case: LoanCase,
+    packet: ReviewPacket,
+    gold: GoldLabel,
+) -> JudgeScore:
+    settings = get_settings()
+    if settings.primary_judge_model:
+        return run_model_judge(loan_case, packet, gold, settings.primary_judge_model)
+    return run_local_judge(loan_case, packet, gold)
+
+
+def run_configured_secondary_judge(
+    loan_case: LoanCase,
+    packet: ReviewPacket,
+    gold: GoldLabel,
+) -> JudgeScore:
+    settings = get_settings()
+    if settings.secondary_judge_model:
+        return run_model_judge(loan_case, packet, gold, settings.secondary_judge_model)
+    return run_strict_local_judge(loan_case, packet, gold)
+
+
+def run_model_judge(
+    loan_case: LoanCase,
+    packet: ReviewPacket,
+    gold: GoldLabel,
+    model: str,
+) -> JudgeScore:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        raise RuntimeError("Live judge models require OPENAI_API_KEY.")
+
+    from langchain_openai import ChatOpenAI
+
+    llm = ChatOpenAI(
+        api_key=settings.openai_api_key,
+        model=model,
+        temperature=settings.judge_temperature,
+    )
+    response = llm.invoke(build_judge_prompt(loan_case, packet, gold))
+    content = response.content if hasattr(response, "content") else str(response)
+    if not isinstance(content, str):
+        content = str(content)
+    return parse_judge_response(_strip_json_fence(content))
+
+
 def validate_judge_payload(payload: dict[str, Any]) -> JudgeScore:
     required_fields = [
         *JUDGE_DIMENSIONS,
@@ -121,6 +168,15 @@ def validate_judge_payload(payload: dict[str, Any]) -> JudgeScore:
         major_failure_category=payload["major_failure_category"],
         rationale=payload["rationale"],
     )
+
+
+def _strip_json_fence(content: str) -> str:
+    stripped = content.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.strip("`")
+        if stripped.lower().startswith("json"):
+            stripped = stripped[4:].strip()
+    return stripped
 
 
 def run_local_judge(loan_case: LoanCase, packet: ReviewPacket, gold: GoldLabel) -> JudgeScore:

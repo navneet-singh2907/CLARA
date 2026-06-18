@@ -66,6 +66,8 @@ def main() -> None:
     st.sidebar.metric("Agent mode", mode_label)
     st.sidebar.metric("LLM model", settings.openai_model if settings.use_llm_agents else "Off")
     st.sidebar.metric("LLM temperature", f"{settings.llm_temperature:.2f}" if settings.use_llm_agents else "Off")
+    st.sidebar.metric("Primary judge", settings.primary_judge_model or "Local")
+    st.sidebar.metric("Secondary judge", settings.secondary_judge_model or "Local strict")
     st.sidebar.metric("LangSmith tracing", "On" if settings.langsmith_tracing else "Off")
     st.sidebar.caption(f"Trace project: {settings.langsmith_project}")
     st.sidebar.metric("Gold set", "30 cases")

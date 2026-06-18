@@ -25,6 +25,9 @@ class Settings:
     openai_api_key: str | None
     openai_model: str
     llm_temperature: float
+    primary_judge_model: str | None
+    secondary_judge_model: str | None
+    judge_temperature: float
     langsmith_tracing: bool
     langsmith_project: str
 
@@ -37,6 +40,9 @@ def get_settings() -> Settings:
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         llm_temperature=float(os.getenv("LLM_TEMPERATURE", "0.2")),
+        primary_judge_model=os.getenv("PRIMARY_JUDGE_MODEL") or None,
+        secondary_judge_model=os.getenv("SECONDARY_JUDGE_MODEL") or None,
+        judge_temperature=float(os.getenv("JUDGE_TEMPERATURE", "0.2")),
         langsmith_tracing=_env_bool("LANGSMITH_TRACING", default=False)
         or _env_bool("LANGCHAIN_TRACING_V2", default=False),
         langsmith_project=os.getenv("LANGSMITH_PROJECT", "loan-review-pipeline"),
