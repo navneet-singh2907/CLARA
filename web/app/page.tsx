@@ -97,7 +97,26 @@ type ActivityLog = {
   metadata?: Record<string, unknown>;
 };
 
+type Readiness = {
+  api: string;
+  app: string;
+  gold_set_cases: number;
+  difficulty_tiers: Record<string, number>;
+  llm_mode: boolean;
+  live_llm_available: boolean;
+  llm_provider: string;
+  llm_model: string;
+  llm_temperature: number | null;
+  primary_judge: string;
+  secondary_judge: string;
+  live_judges_available: boolean;
+  langsmith_tracing: boolean;
+  langsmith_project: string;
+  live_drift_available: boolean;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API_TIMEOUT_MS = 45000;
 
 const policyOptions = [
   { value: "sba_reviewer", label: "SBA Reviewer" },
@@ -148,22 +167,37 @@ export default function Home() {
   const [auditRationale, setAuditRationale] = useState(
     "Updated guarantor documentation and verified collateral support justify conditional approval despite the model escalation."
   );
+  const [readiness, setReadiness] = useState<Readiness | null>(null);
+  const [readinessError, setReadinessError] = useState("");
 
   useEffect(() => {
-    fetch(`${API_BASE}/cases`)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Cases request failed with status ${response.status}`);
+    async function loadInitialState() {
+      try {
+        const [casesResponse, readinessResponse] = await Promise.all([
+          fetch(`${API_BASE}/cases`),
+          fetch(`${API_BASE}/readiness`)
+        ]);
+        if (!casesResponse.ok) {
+          throw new Error(`Cases request failed with status ${casesResponse.status}`);
         }
-        return response.json();
-      })
-      .then((payload: LoanCase[]) => {
+        const payload = (await casesResponse.json()) as LoanCase[];
         setCases(payload);
         if (payload.length > 0 && !payload.some((item) => item.case_id === selectedCase)) {
           setSelectedCase(payload[0].case_id);
         }
-      })
-      .catch((caught: Error) => setError(caught.message));
+        if (readinessResponse.ok) {
+          setReadiness((await readinessResponse.json()) as Readiness);
+          setReadinessError("");
+        } else {
+          setReadinessError(`Readiness request failed with status ${readinessResponse.status}`);
+        }
+      } catch (caught) {
+        const message = formatApiError(caught, "/readiness");
+        setError(message);
+        setReadinessError(message);
+      }
+    }
+    void loadInitialState();
   }, [selectedCase]);
 
   const completedAgents = useMemo(
@@ -258,7 +292,7 @@ export default function Home() {
     source.onerror = () => {
       source.close();
       setIsRunning(false);
-      setError("SSE connection failed. Make sure FastAPI is running on port 8000.");
+      setError(`CLARA live stream is not connected. Start the backend, then retry. Endpoint: ${API_BASE}/review/stream`);
     };
   }
 
@@ -283,6 +317,14 @@ export default function Home() {
     setProgressState((current) => (current ? { ...current, ...partial } : current));
   }
 
+  function failProgress(panel: string, label: string) {
+    setProgressState((current) =>
+      current?.panel === panel
+        ? { ...current, completed: 0, status: "error", current: label }
+        : current
+    );
+  }
+
   function finishProgress(panel: string, label = "Completed") {
     setProgressState((current) =>
       current?.panel === panel
@@ -294,16 +336,21 @@ export default function Home() {
   async function loadJson<T>(path: string, panel: string): Promise<T | null> {
     setError("");
     setLoadingPanel(panel);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
     try {
-      const response = await fetch(`${API_BASE}${path}`);
+      const response = await fetch(`${API_BASE}${path}`, { signal: controller.signal });
       if (!response.ok) {
         throw new Error(`${path} failed with status ${response.status}`);
       }
       return (await response.json()) as T;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(formatApiError(caught, path));
+      failProgress(panel, "API request failed");
+      addActivityLog(panel, "api_error", formatApiError(caught, path), { endpoint: path });
       return null;
     } finally {
+      window.clearTimeout(timeout);
       setLoadingPanel("");
     }
   }
@@ -311,16 +358,21 @@ export default function Home() {
   async function loadText(path: string, panel: string): Promise<string | null> {
     setError("");
     setLoadingPanel(panel);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
     try {
-      const response = await fetch(`${API_BASE}${path}`);
+      const response = await fetch(`${API_BASE}${path}`, { signal: controller.signal });
       if (!response.ok) {
         throw new Error(`${path} failed with status ${response.status}`);
       }
       return await response.text();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(formatApiError(caught, path));
+      failProgress(panel, "API request failed");
+      addActivityLog(panel, "api_error", formatApiError(caught, path), { endpoint: path });
       return null;
     } finally {
+      window.clearTimeout(timeout);
       setLoadingPanel("");
     }
   }
@@ -348,16 +400,95 @@ export default function Home() {
     }
   }
 
-  async function loadDrift() {
+  function loadLiveDrift() {
     setActivityLogs((current) => current.filter((item) => item.panel !== "drift"));
-    startProgress("drift", "Running repeated drift checks", 30);
-    addActivityLog("drift", "repeat_runs_queued", "Queued repeated runs to measure output variance.");
-    updateProgress({ completed: 1, current: "Starting repeated runs" });
+    setDriftResult(null);
+    setError("");
+    setLoadingPanel("drift");
+    startProgress("drift", "Running live LLM drift probe", 3);
+    addActivityLog("drift", "live_probe_queued", "Queued selected case for repeated live LLM runs.", {
+      case_id: selectedCase,
+      review_policy: policy,
+      repeats: 3
+    });
+
+    const source = new EventSource(
+      `${API_BASE}/drift/live/stream?case_id=${encodeURIComponent(selectedCase)}&policy=${encodeURIComponent(policy)}&repeats=3`
+    );
+    source.addEventListener("run_started", (message) => {
+      const parsed = JSON.parse((message as MessageEvent).data) as Record<string, unknown>;
+      addActivityLog("drift", "live_probe_started", "Live LLM drift probe started.", parsed);
+      updateProgress({
+        total: Number(parsed.repeats || 3),
+        current: String(parsed.borrower_name || parsed.case_id || "Live LLM run"),
+        status: "running"
+      });
+    });
+    source.addEventListener("drift_activity", (message) => {
+      const parsed = JSON.parse((message as MessageEvent).data) as Record<string, unknown>;
+      addActivityLog(
+        "drift",
+        String(parsed.step || "drift_activity"),
+        String(parsed.message || "Live drift activity received."),
+        parsed
+      );
+    });
+    source.addEventListener("drift_run_completed", (message) => {
+      const parsed = JSON.parse((message as MessageEvent).data) as Record<string, unknown>;
+      addActivityLog("drift", "live_run_completed", `Completed live run ${String(parsed.run)}.`, parsed);
+    });
+    source.addEventListener("progress", (message) => {
+      const parsed = JSON.parse((message as MessageEvent).data) as Record<string, unknown>;
+      updateProgress({
+        completed: Number(parsed.completed || 0),
+        total: Number(parsed.total || 3),
+        current: `Run ${String(parsed.completed || 0)} of ${String(parsed.total || 3)}`
+      });
+    });
+    source.addEventListener("run_completed", (message) => {
+      const parsed = JSON.parse((message as MessageEvent).data) as DriftResult & Record<string, unknown>;
+      source.close();
+      setLoadingPanel("");
+      addActivityLog("drift", "live_probe_completed", "Compared live-run fingerprints for selected case.", {
+        variant_count: parsed.variant_count,
+        stability_rate: parsed.stability_rate,
+        fingerprints: parsed.fingerprints
+      });
+      setDriftResult(parsed);
+      finishProgress("drift", "Live drift probe complete");
+    });
+    source.addEventListener("error", (message) => {
+      source.close();
+      setLoadingPanel("");
+      const parsed = message instanceof MessageEvent && message.data
+        ? JSON.parse(message.data) as Record<string, unknown>
+        : { message: "Live drift stream failed." };
+      const errorMessage = String(parsed.message || "Live drift stream failed.");
+      setError(errorMessage);
+      failProgress("drift", "Live drift failed");
+      addActivityLog("drift", "live_drift_error", errorMessage, parsed);
+    });
+    source.onerror = () => {
+      source.close();
+      setLoadingPanel("");
+      const message = `CLARA live drift stream is not connected. Start the backend, then retry. Endpoint: ${API_BASE}/drift/live/stream`;
+      setError(message);
+      failProgress("drift", "Live drift failed");
+      addActivityLog("drift", "stream_error", message);
+    };
+  }
+
+  async function loadDriftBenchmark() {
+    setActivityLogs((current) => current.filter((item) => item.panel !== "drift"));
+    setDriftResult(null);
+    startProgress("drift", "Running deterministic 30-case drift benchmark", 30);
+    addActivityLog("drift", "benchmark_queued", "Queued offline repeated runs to verify benchmark reproducibility.");
+    updateProgress({ completed: 1, current: "Starting deterministic benchmark" });
     const payload = await loadJson<DriftResult>("/drift", "drift");
     if (payload) {
-      addActivityLog("drift", "fingerprints_computed", "Computed output fingerprints and stability rate.");
+      addActivityLog("drift", "benchmark_completed", "Computed offline fingerprints and stability rate.");
       setDriftResult(payload);
-      finishProgress("drift", "Drift study complete");
+      finishProgress("drift", "Deterministic drift benchmark complete");
     }
   }
 
@@ -472,7 +603,18 @@ export default function Home() {
       source.addEventListener("progress", (message) => {
         const parsed = JSON.parse((message as MessageEvent).data) as Record<string, unknown>;
         if (panel !== "judges") {
-          addActivityLog(panel, "progress", `Completed ${String(parsed.current_case || "case")}.`, parsed);
+          const completed = Number(parsed.completed || 0);
+          const total = Number(parsed.total || 30);
+          addActivityLog(
+            panel,
+            "progress",
+            `Completed ${String(parsed.current_case || "case")} (${completed} of ${total}).`,
+            {
+              completed_cases: completed,
+              total_cases: total,
+              current_case: parsed.current_case
+            }
+          );
         }
         updateProgress({
           completed: Number(parsed.completed || 0),
@@ -501,14 +643,14 @@ export default function Home() {
         setLoadingPanel("");
         const parsed = message instanceof MessageEvent ? JSON.parse(message.data) : {};
         setError(String(parsed.message || `${panel} failed.`));
-        updateProgress({ status: "error", current: "Failed" });
+        updateProgress({ completed: 0, status: "error", current: "Failed" });
         resolve();
       });
       source.onerror = () => {
         source.close();
         setLoadingPanel("");
-        setError(`${panel} progress stream failed.`);
-        updateProgress({ status: "error", current: "Stream failed" });
+        setError(`CLARA live stream is not connected. Start the backend, then retry. Endpoint: ${API_BASE}${path}`);
+        updateProgress({ completed: 0, status: "error", current: "Stream failed" });
         resolve();
       };
     });
@@ -695,11 +837,7 @@ export default function Home() {
             30-case evaluation, and human override audit logs.
           </p>
         </div>
-        <div className="status-card">
-          <Activity aria-hidden="true" />
-          <span>Live agent observability</span>
-          <strong>{isRunning ? "Streaming" : "Ready"}</strong>
-        </div>
+        <ReadinessCard readiness={readiness} readinessError={readinessError} isRunning={isRunning} />
       </section>
 
       <nav className="tabs" aria-label="Dashboard sections">
@@ -862,15 +1000,19 @@ export default function Home() {
         />
       )}
 
-      {activeTab === "drift" && (
-        <DriftPanel
-          result={driftResult}
-          loading={loadingPanel === "drift"}
-          onRun={loadDrift}
-          progress={progressState?.panel === "drift" ? progressState : null}
-          activityLogs={activityLogs.filter((item) => item.panel === "drift")}
-        />
-      )}
+        {activeTab === "drift" && (
+          <DriftPanel
+            cases={cases}
+            result={driftResult}
+            loading={loadingPanel === "drift"}
+            onRunLive={loadLiveDrift}
+            onRunBenchmark={loadDriftBenchmark}
+            progress={progressState?.panel === "drift" ? progressState : null}
+            activityLogs={activityLogs.filter((item) => item.panel === "drift")}
+            selectedCase={selectedCase}
+            setSelectedCase={setSelectedCase}
+          />
+        )}
 
       {activeTab === "judges" && (
         <JudgePanel
@@ -897,6 +1039,90 @@ export default function Home() {
         />
       )}
     </main>
+  );
+}
+
+function ReadinessCard({
+  readiness,
+  readinessError,
+  isRunning
+}: {
+  readiness: Readiness | null;
+  readinessError: string;
+  isRunning: boolean;
+}) {
+  if (readinessError) {
+    return (
+      <div className="status-card readiness-card error-state">
+        <AlertTriangle aria-hidden="true" />
+        <span>System readiness</span>
+        <strong>API offline</strong>
+        <small>{readinessError}</small>
+      </div>
+    );
+  }
+
+  if (!readiness) {
+    return (
+      <div className="status-card readiness-card">
+        <Loader2 aria-hidden="true" className="spin" />
+        <span>System readiness</span>
+        <strong>Checking</strong>
+      </div>
+    );
+  }
+
+  return (
+    <div className="status-card readiness-card">
+      <Activity aria-hidden="true" />
+      <span>System readiness</span>
+      <strong>{isRunning ? "Streaming" : readiness.live_llm_available ? "Live LLM ready" : "Offline ready"}</strong>
+      <div className="readiness-grid">
+        <ReadinessPill label="API" ready={readiness.api === "connected"} value={readiness.api} />
+        <ReadinessPill
+          label="LLM"
+          ready={readiness.live_llm_available}
+          value={readiness.live_llm_available ? readiness.llm_model : "deterministic"}
+        />
+        <ReadinessPill
+          label="Drift"
+          ready={readiness.live_drift_available}
+          value={readiness.live_drift_available ? "live" : "benchmark"}
+        />
+        <ReadinessPill
+          label="Judges"
+          ready={readiness.live_judges_available}
+          value={readiness.live_judges_available ? "live pair" : "local pair"}
+        />
+        <ReadinessPill
+          label="LangSmith"
+          ready={readiness.langsmith_tracing}
+          value={readiness.langsmith_tracing ? readiness.langsmith_project : "off"}
+        />
+        <ReadinessPill label="Gold set" ready value={`${readiness.gold_set_cases} cases`} />
+      </div>
+      <small>
+        {readiness.llm_provider}
+        {readiness.llm_temperature !== null ? ` | temp ${readiness.llm_temperature}` : ""}
+      </small>
+    </div>
+  );
+}
+
+function ReadinessPill({
+  label,
+  ready,
+  value
+}: {
+  label: string;
+  ready: boolean;
+  value: string;
+}) {
+  return (
+    <div className={ready ? "readiness-pill ready" : "readiness-pill muted-pill"}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -988,42 +1214,85 @@ function AblationPanel({
 }
 
 function DriftPanel({
+  cases,
   result,
   loading,
-  onRun,
+  onRunLive,
+  onRunBenchmark,
   progress,
-  activityLogs
+  activityLogs,
+  selectedCase,
+  setSelectedCase
 }: {
+  cases: LoanCase[];
   result: DriftResult | null;
   loading: boolean;
-  onRun: () => void;
+  onRunLive: () => void;
+  onRunBenchmark: () => void;
   progress: ProgressState | null;
   activityLogs: ActivityLog[];
+  selectedCase: string;
+  setSelectedCase: (value: string) => void;
 }) {
   return (
     <section className="panel">
-      <ActionHeader
-        eyebrow="Nondeterminism check"
-        title="Drift Detection"
-        detail="Repeats cases and fingerprints material outputs to measure run-to-run variance."
-        buttonLabel={loading ? "Running drift" : "Run drift"}
-        onRun={onRun}
-        disabled={loading}
-      />
+      <div className="action-header">
+        <div>
+          <p className="eyebrow">Nondeterminism check</p>
+          <h2>Live LLM Drift Probe</h2>
+          <p className="muted">
+            Repeats the selected case through live LLM agents and fingerprints material outputs to catch run-to-run variance.
+          </p>
+        </div>
+        <div className="button-stack">
+          <button className="primary" type="button" onClick={onRunLive} disabled={loading}>
+            {loading ? "Running live drift" : `Run live probe: ${selectedCase}`}
+          </button>
+          <button className="secondary" type="button" onClick={onRunBenchmark} disabled={loading}>
+            30-case deterministic benchmark
+          </button>
+        </div>
+      </div>
+      <div className="drift-controls">
+        <label>
+          Live drift loan case
+          <select
+            value={selectedCase}
+            onChange={(event) => setSelectedCase(event.target.value)}
+            disabled={loading}
+          >
+            {cases.map((loanCase) => (
+              <option key={loanCase.case_id} value={loanCase.case_id}>
+                {loanCase.case_id} - {loanCase.borrower_name} ({loanCase.tier})
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">
+          Choose any gold-set case. Adversarial cases are best for demoing variance because the LLM has more judgment calls to make.
+        </p>
+      </div>
       <ProgressPanel progress={progress} />
-      <ActivityLogPanel logs={activityLogs} title="Drift Activity Log" emptyMessage="Run drift to see repeated-run stability activity." />
+      <ActivityLogPanel
+        logs={activityLogs}
+        title="Drift Activity Log"
+        emptyMessage="Run live drift to see each LLM repeat, fingerprint, and variance check."
+      />
       {result ? (
         <>
           <div className="metric-grid">
             <Metric icon={<Repeat />} label="Cases" value={String(result.cases)} />
             <Metric icon={<Activity />} label="Runs per case" value={String(result.repeats)} />
             <Metric icon={<BadgeCheck />} label="Stable cases" value={String(result.stable_cases)} />
+            <Metric icon={<AlertTriangle />} label="Drifting cases" value={String(result.drifting_cases)} />
             <Metric icon={<ShieldCheck />} label="Stability rate" value={pct(result.stability_rate)} />
           </div>
           <DataTable rows={result.rows.slice(0, 30)} />
         </>
       ) : (
-        <p className="muted">Run drift to load repeated-run stability results.</p>
+        <p className="muted">
+          Run the live probe to measure LLM nondeterminism, or run the deterministic benchmark to verify reproducible baseline behavior.
+        </p>
       )}
     </section>
   );
@@ -1417,7 +1686,12 @@ function ProgressPanel({ progress }: { progress: ProgressState | null }) {
   if (!progress) {
     return null;
   }
-  const percent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+  const percent =
+    progress.status === "error"
+      ? 0
+      : progress.total > 0
+        ? Math.round((progress.completed / progress.total) * 100)
+        : 0;
   const pending = Math.max(progress.total - progress.completed, 0);
   return (
     <div className={`progress-panel ${progress.status}`}>
@@ -1426,7 +1700,7 @@ function ProgressPanel({ progress }: { progress: ProgressState | null }) {
           {progress.status === "running" && <Loader2 aria-hidden="true" className="spin" />}
           {progress.label}
         </span>
-        <strong>{percent}%</strong>
+        <strong>{progress.status === "error" ? "Failed" : `${percent}%`}</strong>
       </div>
       <div className="progress-track">
         <div className="progress-fill" style={{ width: `${Math.min(100, percent)}%` }} />
@@ -1531,13 +1805,31 @@ function formatLogMetadata(metadata: Record<string, unknown>) {
   const hiddenKeys = new Set(["message", "step"]);
   return Object.entries(metadata)
     .filter(([key]) => !hiddenKeys.has(key))
-    .map(([key, value]) => `${key.replaceAll("_", " ")}: ${formatCell(value)}`)
+    .map(([key, value]) => `${key.replaceAll("_", " ")}: ${formatLogValue(value)}`)
     .join(" | ");
+}
+
+function formatLogValue(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? String(value) : value.toFixed(4);
+  }
+  return formatCell(value);
 }
 
 function pct(value: unknown) {
   const numberValue = typeof value === "number" ? value : Number(value || 0);
   return `${(numberValue * 100).toFixed(2)}%`;
+}
+
+function formatApiError(caught: unknown, path: string) {
+  const message = caught instanceof Error ? caught.message : "Request failed.";
+  if (caught instanceof DOMException && caught.name === "AbortError") {
+    return `CLARA API request timed out after ${Math.round(API_TIMEOUT_MS / 1000)} seconds. Endpoint: ${API_BASE}${path}`;
+  }
+  if (message === "Failed to fetch" || message.includes("fetch")) {
+    return `CLARA API is not connected. Start the backend, then retry this action. Endpoint: ${API_BASE}${path}`;
+  }
+  return message;
 }
 
 function defaultAuditDecision(packet: Record<string, unknown>) {

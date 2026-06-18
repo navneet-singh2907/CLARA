@@ -25,7 +25,7 @@ Loan review decisions can affect whether a small business receives capital, surv
 - PDF export of the review packet
 - LangSmith-compatible optional tracing
 - 30-case gold-set evaluation with clean, ambiguous, and adversarial tiers
-- Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, drift detection, and confidence calibration
+- Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, live LLM drift probing, deterministic drift benchmarking, and confidence calibration
 - Per-case progress indicators for full live 30-case evaluation and judge runs
 - FastAPI SSE streaming endpoints for live agent and evaluation events
 - GitHub Actions CI for lint, compile, and tests
@@ -40,9 +40,9 @@ Current deterministic evaluation results on the controlled SBA-style gold set:
 | Difficulty tiers | 10 clean / 10 ambiguous / 10 adversarial |
 | Final outcome accuracy | 100.00% |
 | Risk band accuracy | 100.00% |
-| Drift stability | 100.00% across 5 runs per case |
+| Deterministic drift stability | 100.00% across 5 runs per case |
 | Risk confidence expected calibration error | 17.00% |
-| Test suite | 61 passing tests |
+| Test suite | 81 passing tests |
 
 The deterministic benchmark is intentionally controlled: it validates orchestration, scoring contracts, ablations, and UI behavior against a stable 30-case set. The live LLM mode is where non-deterministic agent behavior, primary/secondary judge disagreement, and LangSmith traceability become visible. Confidence calibration remains visible as a separate quality signal even when label accuracy is high.
 
@@ -113,7 +113,8 @@ Evaluation includes:
 - PDF export of the human review packet
 - Ablation visualization that shows each agent's measured contribution
 - Confidence calibration comparing risk confidence to observed accuracy
-- Drift detection for repeated agent runs
+- Live LLM drift probe for selected-case nondeterminism
+- Deterministic drift benchmark for repeated 30-case reproducibility
 - LangGraph execution trace showing the parallel specialist review stage
 - Reviewer policy mode: SBA reviewer, bank underwriter, and CDFI lender
 
@@ -148,9 +149,13 @@ docs/
   demo_script.md
   evaluation_plan.md
   cv_bullets.md
+sample_documents/
+  Northstar_Custom_Cabinets_Loan_Profile.pdf
 requirements.txt
 README.md
 tests/
+Dockerfile.api
+docker-compose.yml
 ```
 
 ## Useful Docs
@@ -158,8 +163,10 @@ tests/
 - [Architecture](docs/architecture.md)
 - [Evaluation Plan](docs/evaluation_plan.md)
 - [Data Source Notes](docs/data_source.md)
+- [Deployment Guide](DEPLOYMENT.md)
 - [Demo Script](docs/demo_script.md)
 - [CV And Interview Notes](docs/cv_bullets.md)
+- [Sample Loan Documents](sample_documents/README.md)
 
 ## Setup
 
@@ -197,7 +204,7 @@ SECONDARY_JUDGE_MODEL=openai/gpt-oss-120b
 JUDGE_TEMPERATURE=0.2
 ```
 
-The default deterministic mode keeps evaluation reproducible. For a live Agentic AI demo, set `USE_LLM_AGENTS=true` with `NEBIUS_API_KEY` and `NEBIUS_BASE_URL`. The project uses LangChain's OpenAI-compatible chat client, so Nebius model endpoints work by passing the Nebius base URL. In live mode, the Term Extractor, Compliance Checker reviewer note, and Credit Risk Scorer rationale use model calls. If `PRIMARY_JUDGE_MODEL` and `SECONDARY_JUDGE_MODEL` are set, the evaluation judge and inter-rater agreement flow use live model judges too. Set `LLM_TEMPERATURE` and `JUDGE_TEMPERATURE` above `0` when you want to demonstrate non-deterministic language behavior and then use the Drift tab to measure whether outputs change across repeated runs.
+The default deterministic mode keeps evaluation reproducible. For a live Agentic AI demo, set `USE_LLM_AGENTS=true` with `NEBIUS_API_KEY` and `NEBIUS_BASE_URL`. The project uses LangChain's OpenAI-compatible chat client, so Nebius model endpoints work by passing the Nebius base URL. In live mode, the Term Extractor, Compliance Checker reviewer note, and Credit Risk Scorer rationale use model calls. If `PRIMARY_JUDGE_MODEL` and `SECONDARY_JUDGE_MODEL` are set, the evaluation judge and inter-rater agreement flow use live model judges too. Set `LLM_TEMPERATURE` and `JUDGE_TEMPERATURE` above `0` when you want to demonstrate non-deterministic language behavior. The Drift tab has two modes: a selected-case live LLM drift probe for true repeated model calls, and a 30-case deterministic benchmark for reproducible baseline stability.
 
 Optional LangSmith tracing:
 
@@ -209,13 +216,35 @@ LANGSMITH_PROJECT=loan-review-pipeline
 
 Tracing is optional and off by default. When enabled, the pipeline emits LangSmith traces for the top-level loan review run, Term Extractor, Compliance Checker, Credit Risk Scorer, and Review Synthesizer. Deterministic mode remains reproducible while still giving an observable graph execution record.
 
-Run the app:
+Run the legacy Streamlit app:
 
 ```powershell
 streamlit run loan_pipeline/ui/app.py
 ```
 
-The dashboard includes loan review, reviewer policy comparison, evaluation metrics, ablation results, drift detection, judge agreement, PDF export, and report preview tabs.
+The Streamlit dashboard remains available as a local fallback. The primary demo UI is the Next.js app in `web/`.
+
+Run the Next.js UI:
+
+```powershell
+cd web
+npm.cmd install
+$env:NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8000"
+npm.cmd run dev
+```
+
+Run the Dockerized full stack:
+
+```powershell
+Copy-Item .env.docker.example .env
+docker compose up --build
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
 
 Run the optional SSE API:
 
@@ -230,19 +259,24 @@ GET http://127.0.0.1:8000/health
 GET http://127.0.0.1:8000/cases
 GET http://127.0.0.1:8000/review/stream?case_id=ADV-001&policy=sba_reviewer
 GET http://127.0.0.1:8000/evaluation/stream
+GET http://127.0.0.1:8000/drift/live/stream?case_id=ADV-001&policy=sba_reviewer&repeats=3
 GET http://127.0.0.1:8000/judge-agreement/stream
 ```
 
-The SSE API emits events such as `run_started`, `agent_completed`, `progress`, `run_completed`, and `error`. This is intended for production-style observability and demoing that the agents are actively moving through the graph.
+The SSE API emits events such as `run_started`, `agent_completed`, `drift_activity`, `drift_run_completed`, `progress`, `run_completed`, and `error`. This is intended for production-style observability and demoing that the agents are actively moving through the graph.
 
 ## Demo Script
 
 See [docs/demo_script.md](docs/demo_script.md) for the polished presentation walkthrough.
 
+See [DEPLOYMENT.md](DEPLOYMENT.md) for local, Vercel, and backend-host deployment setup.
+
 Quick start:
 
 ```powershell
-streamlit run loan_pipeline/ui/app.py
+.\.venv\Scripts\python.exe -m uvicorn loan_pipeline.api.app:app --host 127.0.0.1 --port 8000 --reload
+cd web
+npm.cmd run dev
 ```
 
 ## Cupcake MVP

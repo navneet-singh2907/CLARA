@@ -86,7 +86,7 @@ The evaluation harness measures whether the Credit Risk Scorer's confidence is c
 
 ## Drift Detection
 
-The evaluation harness can run each case multiple times and fingerprint material review outputs. This detects nondeterministic drift in outcome, compliance, risk, contradictions, counterfactuals, and human-review notes. Deterministic mode should produce a 100% stability rate, while LLM mode can reveal variance that requires prompt, temperature, or orchestration controls.
+The evaluation harness has two drift paths. The deterministic 30-case benchmark runs each case multiple times and fingerprints material review outputs to confirm baseline reproducibility. The live LLM drift probe repeats one selected case through live model-backed agents and compares fingerprints across runs. That second path is the nondeterminism check: it reveals whether temperature, provider behavior, prompts, or orchestration produce different outcomes, risk bands, compliance statuses, contradictions, counterfactuals, or human-review notes.
 
 ## Agent Contract
 

@@ -14,9 +14,10 @@ from pydantic import BaseModel, Field
 from loan_pipeline.api.streaming import (
     stream_evaluation_events,
     stream_judge_agreement_events,
+    stream_live_drift_events,
     stream_review_events,
 )
-from loan_pipeline.config import load_sba_demo_cases, offline_evaluation_context
+from loan_pipeline.config import get_settings, load_sba_demo_cases, offline_evaluation_context
 from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
 from loan_pipeline.eval.drift import run_drift_study
 from loan_pipeline.eval.inter_rater import run_inter_rater_report, run_packet_inter_rater_report
@@ -125,6 +126,36 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/readiness")
+def readiness() -> dict[str, Any]:
+    settings = get_settings()
+    cases = load_sba_demo_cases()
+    live_llm_available = settings.use_llm_agents and bool(settings.llm_api_key)
+    primary_judge_available = bool(settings.primary_judge_model)
+    secondary_judge_available = bool(settings.secondary_judge_model)
+    return {
+        "api": "connected",
+        "app": "CLARA",
+        "gold_set_cases": len(cases),
+        "difficulty_tiers": {
+            "clean": sum(1 for loan_case in cases if loan_case.difficulty_tier == "clean"),
+            "ambiguous": sum(1 for loan_case in cases if loan_case.difficulty_tier == "ambiguous"),
+            "adversarial": sum(1 for loan_case in cases if loan_case.difficulty_tier == "adversarial"),
+        },
+        "llm_mode": settings.use_llm_agents,
+        "live_llm_available": live_llm_available,
+        "llm_provider": settings.llm_provider,
+        "llm_model": settings.openai_model,
+        "llm_temperature": settings.llm_temperature if live_llm_available else None,
+        "primary_judge": settings.primary_judge_model or "local deterministic judge",
+        "secondary_judge": settings.secondary_judge_model or "local strict judge",
+        "live_judges_available": primary_judge_available and secondary_judge_available,
+        "langsmith_tracing": settings.langsmith_tracing,
+        "langsmith_project": settings.langsmith_project,
+        "live_drift_available": live_llm_available,
+    }
+
+
 @app.get("/cases")
 def cases() -> list[dict[str, str]]:
     return [
@@ -206,17 +237,32 @@ def evaluation_stream() -> StreamingResponse:
 
 @app.get("/evaluation")
 def evaluation() -> dict:
-    return run_eval()
+    with offline_evaluation_context():
+        return run_eval()
 
 
 @app.get("/ablation")
 def ablation() -> list[dict]:
-    return summarize_ablation_table(run_ablation_study())
+    with offline_evaluation_context():
+        return summarize_ablation_table(run_ablation_study())
 
 
 @app.get("/drift")
 def drift(repeats: int = Query(5, ge=2, le=10)) -> dict:
-    return run_drift_study(repeats=repeats)
+    with offline_evaluation_context():
+        return run_drift_study(repeats=repeats)
+
+
+@app.get("/drift/live/stream")
+def live_drift_stream(
+    case_id: str = CASE_ID_QUERY,
+    policy: ReviewPolicy = POLICY_QUERY,
+    repeats: int = Query(3, ge=2, le=5),
+) -> StreamingResponse:
+    return StreamingResponse(
+        stream_live_drift_events(case_id=case_id, review_policy=policy, repeats=repeats),
+        media_type="text/event-stream",
+    )
 
 
 @app.get("/judge-agreement/stream")

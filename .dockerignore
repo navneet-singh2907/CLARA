@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.env
+tmp
+output
+reports
+web/node_modules
+web/.next
+web/out
+streamlit*.log
+loan_pipeline/data/*.local.csv
+loan_pipeline/data/*.downloaded.csv

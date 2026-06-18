@@ -6,9 +6,10 @@ from threading import Thread
 from typing import Any, Iterable
 
 from loan_pipeline.config import get_settings, load_sba_demo_cases
+from loan_pipeline.eval.drift import fingerprint_review_packet
 from loan_pipeline.eval.inter_rater import run_inter_rater_report
 from loan_pipeline.eval.run_eval import load_gold_labels, run_eval
-from loan_pipeline.graph.orchestrator import build_review_graph
+from loan_pipeline.graph.orchestrator import build_review_graph, run_pipeline
 from loan_pipeline.graph.state import ReviewPolicy, initial_state
 
 
@@ -217,6 +218,120 @@ def stream_judge_agreement_events() -> Iterable[str]:
         if item is None:
             break
         yield item
+
+
+def stream_live_drift_events(
+    case_id: str,
+    review_policy: ReviewPolicy = "sba_reviewer",
+    repeats: int = 3,
+) -> Iterable[str]:
+    settings = get_settings()
+    if not settings.use_llm_agents:
+        yield sse_event(
+            "error",
+            {
+                "run_type": "live_drift",
+                "message": "Live drift requires USE_LLM_AGENTS=true so repeated runs call the configured LLM.",
+            },
+        )
+        return
+    if not settings.llm_api_key:
+        yield sse_event(
+            "error",
+            {
+                "run_type": "live_drift",
+                "message": "Live drift requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY.",
+            },
+        )
+        return
+
+    cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
+    loan_case = cases.get(case_id)
+    if loan_case is None:
+        yield sse_event("error", {"run_type": "live_drift", "message": f"Unknown case_id: {case_id}"})
+        return
+
+    bounded_repeats = max(2, min(repeats, 5))
+    yield sse_event(
+        "run_started",
+        {
+            "run_type": "live_drift",
+            "case_id": loan_case.case_id,
+            "borrower_name": loan_case.borrower_name,
+            "review_policy": review_policy,
+            "repeats": bounded_repeats,
+            "model": settings.openai_model,
+            "provider": settings.llm_provider,
+            "temperature": settings.llm_temperature,
+        },
+    )
+
+    fingerprints: list[str] = []
+    rows: list[dict[str, Any]] = []
+    for run_number in range(1, bounded_repeats + 1):
+        yield sse_event(
+            "drift_activity",
+            {
+                "step": "live_run_started",
+                "message": f"Starting live LLM drift run {run_number} of {bounded_repeats}.",
+                "case_id": loan_case.case_id,
+                "run_number": run_number,
+                "model": settings.openai_model,
+            },
+        )
+        try:
+            packet = run_pipeline(loan_case, review_policy=review_policy)
+        except Exception as exc:
+            yield sse_event(
+                "error",
+                {
+                    "run_type": "live_drift",
+                    "case_id": loan_case.case_id,
+                    "run_number": run_number,
+                    "message": str(exc),
+                },
+            )
+            return
+
+        fingerprint = fingerprint_review_packet(packet)
+        fingerprints.append(fingerprint)
+        row = {
+            "run": run_number,
+            "case_id": packet.case_id,
+            "fingerprint": fingerprint,
+            "outcome": packet.recommended_outcome,
+            "risk": packet.risk.band,
+            "risk_score": packet.risk.score,
+            "compliance": packet.compliance.status,
+            "term_confidence": packet.extracted_terms.confidence,
+            "risk_confidence": packet.risk.confidence,
+            "compliance_confidence": packet.compliance.confidence,
+            "counterfactuals": len(packet.counterfactuals),
+            "contradictions": len(packet.contradictions),
+        }
+        rows.append(row)
+        yield sse_event("drift_run_completed", row)
+        yield sse_event(
+            "progress",
+            {"completed": run_number, "total": bounded_repeats, "current_case": loan_case.case_id},
+        )
+
+    variant_count = len(set(fingerprints))
+    yield sse_event(
+        "run_completed",
+        {
+            "run_type": "live_drift",
+            "cases": 1,
+            "case_id": loan_case.case_id,
+            "repeats": bounded_repeats,
+            "stable_cases": 1 if variant_count == 1 else 0,
+            "drifting_cases": 0 if variant_count == 1 else 1,
+            "stability_rate": 1.0 if variant_count == 1 else 0.0,
+            "variant_count": variant_count,
+            "fingerprints": fingerprints,
+            "rows": rows,
+        },
+    )
 
 
 def json_ready_events(events: Iterable[str]) -> list[dict[str, Any]]:

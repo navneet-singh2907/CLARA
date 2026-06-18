@@ -8,6 +8,7 @@ from loan_pipeline.api.app import app
 from loan_pipeline.api.streaming import (
     sse_event,
     stream_judge_agreement_events,
+    stream_live_drift_events,
     stream_review_events,
 )
 
@@ -44,6 +45,20 @@ def test_api_health_endpoint() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_api_readiness_endpoint() -> None:
+    client = TestClient(app)
+
+    response = client.get("/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["api"] == "connected"
+    assert payload["app"] == "CLARA"
+    assert payload["gold_set_cases"] == 30
+    assert payload["difficulty_tiers"] == {"clean": 10, "ambiguous": 10, "adversarial": 10}
+    assert payload["live_drift_available"] is False
 
 
 def test_api_root_endpoint_lists_streaming_command() -> None:
@@ -99,6 +114,25 @@ def test_api_drift_endpoint() -> None:
 
     assert response.status_code == 200
     assert response.json()["repeats"] == 2
+
+
+def test_live_drift_stream_requires_llm_mode() -> None:
+    events = list(stream_live_drift_events("ADV-001", repeats=2))
+
+    assert len(events) == 1
+    assert events[0].startswith("event: error")
+    payload = _event_payload(events[0])
+    assert "USE_LLM_AGENTS=true" in payload["message"]
+
+
+def test_api_live_drift_stream_endpoint_reports_configuration_error() -> None:
+    client = TestClient(app)
+
+    response = client.get("/drift/live/stream?case_id=ADV-001&repeats=2")
+
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers["content-type"]
+    assert "USE_LLM_AGENTS=true" in response.text
 
 
 def test_api_judge_agreement_endpoint() -> None:
