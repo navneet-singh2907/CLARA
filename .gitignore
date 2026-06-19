@@ -15,4 +15,6 @@ web/node_modules/
 web/.next/
 web/out/
 
-docs/
+docs/*.docx
+docs/*.pdf
+docs/cv_bullets.md
