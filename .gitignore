@@ -14,7 +14,6 @@ loan_pipeline/data/*.downloaded.csv
 web/node_modules/
 web/.next/
 web/out/
-
 docs/*.docx
 docs/*.pdf
 docs/cv_bullets.md
