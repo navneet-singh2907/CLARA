@@ -14,3 +14,5 @@ loan_pipeline/data/*.downloaded.csv
 web/node_modules/
 web/.next/
 web/out/
+
+docs/
