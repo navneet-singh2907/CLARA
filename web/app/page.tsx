@@ -115,7 +115,11 @@ type Readiness = {
   live_drift_available: boolean;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://clara-api-eight.vercel.app"
+    : "http://127.0.0.1:8000");
 const API_TIMEOUT_MS = 45000;
 
 const policyOptions = [
