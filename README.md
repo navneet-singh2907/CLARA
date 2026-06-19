@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/navneet-singh2907/CLARA/actions/workflows/ci.yml/badge.svg)](https://github.com/navneet-singh2907/CLARA/actions/workflows/ci.yml)
 
-Week 3 project for the Gen Academy Agentic AI Bootcamp.
 
 CLARA is a LangChain + LangGraph product for reviewing small business loan applications with specialist agents, human-in-the-loop audit controls, rigorous evaluation, and exportable review packets.
 
