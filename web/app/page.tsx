@@ -1076,52 +1076,7 @@ function ReadinessCard({
     <div className="status-card readiness-card">
       <Activity aria-hidden="true" />
       <span>System readiness</span>
-      <strong>{isRunning ? "Streaming" : readiness.live_llm_available ? "Live LLM ready" : "Offline ready"}</strong>
-      <div className="readiness-grid">
-        <ReadinessPill label="API" ready={readiness.api === "connected"} value={readiness.api} />
-        <ReadinessPill
-          label="LLM"
-          ready={readiness.live_llm_available}
-          value={readiness.live_llm_available ? readiness.llm_model : "deterministic"}
-        />
-        <ReadinessPill
-          label="Drift"
-          ready={readiness.live_drift_available}
-          value={readiness.live_drift_available ? "live" : "benchmark"}
-        />
-        <ReadinessPill
-          label="Judges"
-          ready={readiness.live_judges_available}
-          value={readiness.live_judges_available ? "live pair" : "local pair"}
-        />
-        <ReadinessPill
-          label="LangSmith"
-          ready={readiness.langsmith_tracing}
-          value={readiness.langsmith_tracing ? readiness.langsmith_project : "off"}
-        />
-        <ReadinessPill label="Gold set" ready value={`${readiness.gold_set_cases} cases`} />
-      </div>
-      <small>
-        {readiness.llm_provider}
-        {readiness.llm_temperature !== null ? ` | temp ${readiness.llm_temperature}` : ""}
-      </small>
-    </div>
-  );
-}
-
-function ReadinessPill({
-  label,
-  ready,
-  value
-}: {
-  label: string;
-  ready: boolean;
-  value: string;
-}) {
-  return (
-    <div className={ready ? "readiness-pill ready" : "readiness-pill muted-pill"}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <strong>{isRunning ? "Streaming" : "Ready"}</strong>
     </div>
   );
 }

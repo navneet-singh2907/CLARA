@@ -239,7 +239,7 @@ Before recording:
 
 - API `/health` returns `{"status":"ok"}`.
 - API `/readiness` shows `api: connected`.
-- UI System Readiness shows `Live LLM ready` when using model calls.
+- UI System Readiness shows `Ready`.
 - Drift tab can run one selected case three times.
 - Loan Review tab streams LangGraph events.
 - PDF packet download works.

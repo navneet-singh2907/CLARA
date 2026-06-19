@@ -1,5 +1,7 @@
 # CLARA - Credit Loan Analysis & Review Agent
 
+[![CI](https://github.com/navneet-singh2907/CLARA/actions/workflows/ci.yml/badge.svg)](https://github.com/navneet-singh2907/CLARA/actions/workflows/ci.yml)
+
 Week 3 project for the Gen Academy Agentic AI Bootcamp.
 
 CLARA is a LangChain + LangGraph product for reviewing small business loan applications with specialist agents, human-in-the-loop audit controls, rigorous evaluation, and exportable review packets.
@@ -161,12 +163,39 @@ docker-compose.yml
 ## Useful Docs
 
 - [Architecture](docs/architecture.md)
+- [System Architecture Diagrams](docs/system_architecture.md)
 - [Evaluation Plan](docs/evaluation_plan.md)
 - [Data Source Notes](docs/data_source.md)
 - [Deployment Guide](DEPLOYMENT.md)
 - [Demo Script](docs/demo_script.md)
+- [Demo Assets Checklist](docs/demo_assets.md)
+- [ADV-007 Case Study](docs/case_study_adv_007.md)
 - [CV And Interview Notes](docs/cv_bullets.md)
 - [Sample Loan Documents](sample_documents/README.md)
+
+## Demo Paths
+
+Recommended recording path:
+
+```powershell
+docker compose up
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Alternative local development path:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn loan_pipeline.api.app:app --host 127.0.0.1 --port 8000 --reload
+cd web
+npm.cmd run dev
+```
+
+See [docs/demo_script.md](docs/demo_script.md) for the polished walkthrough and [DEPLOYMENT.md](DEPLOYMENT.md) for local, Docker, Vercel, and hosted-backend setup.
 
 ## Setup
 

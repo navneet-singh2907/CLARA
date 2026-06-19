@@ -112,49 +112,6 @@ h2 {
   box-shadow: none;
 }
 
-.readiness-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.readiness-pill {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.readiness-pill span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.readiness-pill strong {
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.readiness-pill.ready {
-  border-color: rgba(37, 139, 87, 0.28);
-}
-
-.readiness-pill.ready strong {
-  color: var(--good);
-}
-
-.readiness-pill.muted-pill strong {
-  color: var(--muted);
-}
-
 .status-card svg,
 .panel-header svg {
   color: var(--accent-strong);
