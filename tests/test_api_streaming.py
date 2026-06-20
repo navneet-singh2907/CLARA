@@ -6,13 +6,13 @@ from fastapi.testclient import TestClient
 
 from loan_pipeline.api.app import app
 from loan_pipeline.api.rate_limit import reset_rate_limits
-from loan_pipeline.config import reset_settings_cache
 from loan_pipeline.api.streaming import (
     sse_event,
     stream_judge_agreement_events,
     stream_live_drift_events,
     stream_review_events,
 )
+from loan_pipeline.config import reset_settings_cache
 
 
 def test_sse_event_formats_named_json_event() -> None:
