@@ -35,6 +35,11 @@ class Settings:
     judge_temperature: float
     langsmith_tracing: bool
     langsmith_project: str
+    demo_api_key: str | None
+    rate_limit_window_seconds: int
+    rate_limit_review_requests: int
+    rate_limit_expensive_requests: int
+    rate_limit_upload_requests: int
 
 
 @lru_cache(maxsize=1)
@@ -59,6 +64,11 @@ def get_settings() -> Settings:
         langsmith_tracing=_env_bool("LANGSMITH_TRACING", default=False)
         or _env_bool("LANGCHAIN_TRACING_V2", default=False),
         langsmith_project=os.getenv("LANGSMITH_PROJECT", "loan-review-pipeline"),
+        demo_api_key=os.getenv("CLARA_DEMO_KEY") or None,
+        rate_limit_window_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "3600")),
+        rate_limit_review_requests=int(os.getenv("RATE_LIMIT_REVIEW_REQUESTS", "10")),
+        rate_limit_expensive_requests=int(os.getenv("RATE_LIMIT_EXPENSIVE_REQUESTS", "3")),
+        rate_limit_upload_requests=int(os.getenv("RATE_LIMIT_UPLOAD_REQUESTS", "5")),
     )
 
 

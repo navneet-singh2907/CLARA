@@ -6,7 +6,7 @@ import re
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
@@ -17,6 +17,7 @@ from loan_pipeline.api.streaming import (
     stream_live_drift_events,
     stream_review_events,
 )
+from loan_pipeline.api.rate_limit import enforce_rate_limit
 from loan_pipeline.config import get_settings, load_sba_demo_cases, offline_evaluation_context
 from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
 from loan_pipeline.eval.drift import run_drift_study
@@ -153,6 +154,13 @@ def readiness() -> dict[str, Any]:
         "langsmith_tracing": settings.langsmith_tracing,
         "langsmith_project": settings.langsmith_project,
         "live_drift_available": live_llm_available,
+        "rate_limits": {
+            "window_seconds": settings.rate_limit_window_seconds,
+            "review_requests": settings.rate_limit_review_requests,
+            "upload_requests": settings.rate_limit_upload_requests,
+            "expensive_requests": settings.rate_limit_expensive_requests,
+            "demo_key_bypass": bool(settings.demo_api_key),
+        },
     }
 
 
@@ -170,9 +178,11 @@ def cases() -> list[dict[str, str]]:
 
 @app.get("/review/stream")
 def review_stream(
+    request: Request,
     case_id: str = CASE_ID_QUERY,
     policy: ReviewPolicy = POLICY_QUERY,
 ) -> StreamingResponse:
+    enforce_rate_limit(request, "review")
     return StreamingResponse(
         stream_review_events(case_id=case_id, review_policy=policy),
         media_type="text/event-stream",
@@ -180,17 +190,18 @@ def review_stream(
 
 
 @app.post("/review/pdf")
-def review_pdf(request: ReviewPdfRequest) -> Response:
-    if request.loan_case:
-        loan_case = _loan_case_from_payload(request.loan_case)
+def review_pdf(payload: ReviewPdfRequest, request: Request) -> Response:
+    enforce_rate_limit(request, "review")
+    if payload.loan_case:
+        loan_case = _loan_case_from_payload(payload.loan_case)
     else:
         cases_by_id = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
-        loan_case = cases_by_id.get(request.case_id or "")
+        loan_case = cases_by_id.get(payload.case_id or "")
         if loan_case is None:
-            return Response(f"Unknown case_id: {request.case_id}", status_code=404)
+            return Response(f"Unknown case_id: {payload.case_id}", status_code=404)
 
-    packet = run_pipeline(loan_case, review_policy=request.policy)
-    audit_log = [_audit_entry_to_pdf_row(entry) for entry in request.audit_entries]
+    packet = run_pipeline(loan_case, review_policy=payload.policy)
+    audit_log = [_audit_entry_to_pdf_row(entry) for entry in payload.audit_entries]
     pdf_bytes = build_review_packet_pdf(packet, audit_log=audit_log)
     headers = {
         "Content-Disposition": f'attachment; filename="loan_review_packet_{loan_case.case_id}.pdf"'
@@ -200,9 +211,11 @@ def review_pdf(request: ReviewPdfRequest) -> Response:
 
 @app.post("/review/document")
 async def review_document(
+    request: Request,
     file: UploadFile = DOCUMENT_FILE,
     policy: ReviewPolicy = DOCUMENT_POLICY,
 ) -> dict[str, Any]:
+    enforce_rate_limit(request, "upload")
     document_text = await _extract_upload_text(file)
     if not document_text.strip():
         raise HTTPException(status_code=400, detail="Uploaded document did not contain extractable text.")
@@ -231,18 +244,21 @@ async def review_document(
 
 
 @app.get("/evaluation/stream")
-def evaluation_stream() -> StreamingResponse:
+def evaluation_stream(request: Request) -> StreamingResponse:
+    enforce_rate_limit(request, "expensive")
     return StreamingResponse(stream_evaluation_events(), media_type="text/event-stream")
 
 
 @app.get("/evaluation")
-def evaluation() -> dict:
+def evaluation(request: Request) -> dict:
+    enforce_rate_limit(request, "expensive")
     with offline_evaluation_context():
         return run_eval()
 
 
 @app.get("/ablation")
-def ablation() -> list[dict]:
+def ablation(request: Request) -> list[dict]:
+    enforce_rate_limit(request, "expensive")
     with offline_evaluation_context():
         return summarize_ablation_table(run_ablation_study())
 
@@ -255,10 +271,12 @@ def drift(repeats: int = Query(5, ge=2, le=10)) -> dict:
 
 @app.get("/drift/live/stream")
 def live_drift_stream(
+    request: Request,
     case_id: str = CASE_ID_QUERY,
     policy: ReviewPolicy = POLICY_QUERY,
     repeats: int = Query(3, ge=2, le=5),
 ) -> StreamingResponse:
+    enforce_rate_limit(request, "expensive")
     return StreamingResponse(
         stream_live_drift_events(case_id=case_id, review_policy=policy, repeats=repeats),
         media_type="text/event-stream",
@@ -266,17 +284,20 @@ def live_drift_stream(
 
 
 @app.get("/judge-agreement/stream")
-def judge_agreement_stream() -> StreamingResponse:
+def judge_agreement_stream(request: Request) -> StreamingResponse:
+    enforce_rate_limit(request, "expensive")
     return StreamingResponse(stream_judge_agreement_events(), media_type="text/event-stream")
 
 
 @app.get("/judge-agreement")
-def judge_agreement() -> dict:
+def judge_agreement(request: Request) -> dict:
+    enforce_rate_limit(request, "expensive")
     return run_inter_rater_report()
 
 
 @app.post("/judge-agreement/packet")
-async def judge_agreement_packet(file: UploadFile = DOCUMENT_FILE) -> dict[str, Any]:
+async def judge_agreement_packet(request: Request, file: UploadFile = DOCUMENT_FILE) -> dict[str, Any]:
+    enforce_rate_limit(request, "upload")
     packet_text = await _extract_upload_text(file)
     if not packet_text.strip():
         raise HTTPException(status_code=400, detail="Uploaded packet did not contain extractable text.")
@@ -287,14 +308,16 @@ async def judge_agreement_packet(file: UploadFile = DOCUMENT_FILE) -> dict[str, 
 
 
 @app.get("/report")
-def report() -> Response:
+def report(request: Request) -> Response:
+    enforce_rate_limit(request, "expensive")
     with offline_evaluation_context():
         report_text = generate_evaluation_report()
     return Response(report_text, media_type="text/markdown")
 
 
 @app.get("/report/pdf")
-def report_pdf() -> Response:
+def report_pdf(request: Request) -> Response:
+    enforce_rate_limit(request, "expensive")
     with offline_evaluation_context():
         pdf_bytes = build_evaluation_report_pdf()
     headers = {"Content-Disposition": 'attachment; filename="evaluation_report.pdf"'}

@@ -5,6 +5,8 @@ import json
 from fastapi.testclient import TestClient
 
 from loan_pipeline.api.app import app
+from loan_pipeline.api.rate_limit import reset_rate_limits
+from loan_pipeline.config import reset_settings_cache
 from loan_pipeline.api.streaming import (
     sse_event,
     stream_judge_agreement_events,
@@ -45,6 +47,37 @@ def test_api_health_endpoint() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_rate_limit_protects_expensive_endpoints(monkeypatch) -> None:
+    monkeypatch.setenv("RATE_LIMIT_EXPENSIVE_REQUESTS", "1")
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_SECONDS", "3600")
+    reset_settings_cache()
+    reset_rate_limits()
+    client = TestClient(app)
+
+    first_response = client.get("/evaluation")
+    second_response = client.get("/evaluation")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.json()["detail"]["bucket"] == "expensive"
+    assert "Retry-After" in second_response.headers
+
+
+def test_rate_limit_allows_demo_key_bypass(monkeypatch) -> None:
+    monkeypatch.setenv("CLARA_DEMO_KEY", "demo-secret")
+    monkeypatch.setenv("RATE_LIMIT_EXPENSIVE_REQUESTS", "1")
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_SECONDS", "3600")
+    reset_settings_cache()
+    reset_rate_limits()
+    client = TestClient(app)
+
+    first_response = client.get("/evaluation")
+    second_response = client.get("/evaluation", headers={"x-clara-demo-key": "demo-secret"})
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
 
 
 def test_api_readiness_endpoint() -> None:

@@ -31,6 +31,7 @@ Loan review decisions can affect whether a small business receives capital, surv
 - Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, live LLM drift probing, deterministic drift benchmarking, and confidence calibration
 - Per-case progress indicators for full live 30-case evaluation and judge runs
 - FastAPI SSE streaming endpoints for live agent and evaluation events
+- API rate limiting on live/repeated model endpoints to protect hosted demo credits
 - GitHub Actions CI for lint, compile, and tests
 
 ## Results Snapshot
@@ -197,6 +198,43 @@ npm.cmd run dev
 ```
 
 See [docs/demo_script.md](docs/demo_script.md) for the polished walkthrough and [DEPLOYMENT.md](DEPLOYMENT.md) for local, Docker, Vercel, and hosted-backend setup.
+
+## Public Demo Safety
+
+CLARA rate-limits expensive public API routes so a shared demo link cannot burn through model credits.
+
+Open routes:
+
+- `/health`
+- `/readiness`
+- `/cases`
+
+Limited routes:
+
+- `/review/stream`
+- `/review/pdf`
+- `/review/document`
+- `/evaluation`
+- `/evaluation/stream`
+- `/ablation`
+- `/drift/live/stream`
+- `/judge-agreement`
+- `/judge-agreement/stream`
+- `/judge-agreement/packet`
+- `/report`
+- `/report/pdf`
+
+Useful environment variables:
+
+```text
+RATE_LIMIT_WINDOW_SECONDS=3600
+RATE_LIMIT_REVIEW_REQUESTS=10
+RATE_LIMIT_UPLOAD_REQUESTS=5
+RATE_LIMIT_EXPENSIVE_REQUESTS=3
+CLARA_DEMO_KEY=<optional_private_demo_bypass_key>
+```
+
+When `CLARA_DEMO_KEY` is set, requests with header `x-clara-demo-key: <key>` bypass the public quota for recording or judging demos. Never put this key in frontend code.
 
 ## Setup
 

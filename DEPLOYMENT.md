@@ -142,6 +142,11 @@ LANGSMITH_TRACING=false
 LANGSMITH_API_KEY=
 LANGSMITH_PROJECT=loan-review-pipeline
 APP_ENV=production
+RATE_LIMIT_WINDOW_SECONDS=3600
+RATE_LIMIT_REVIEW_REQUESTS=10
+RATE_LIMIT_UPLOAD_REQUESTS=5
+RATE_LIMIT_EXPENSIVE_REQUESTS=3
+CLARA_DEMO_KEY=<optional_private_demo_bypass_key>
 ```
 
 Generic provider aliases are also supported:
@@ -152,6 +157,14 @@ LLM_BASE_URL=<openai_compatible_base_url>
 ```
 
 Use either the Nebius-specific variables or the generic variables. Do not put API keys in the frontend project.
+
+Rate-limit defaults protect public demo credits:
+
+- Review pipeline/PDF routes: `10` requests per IP per hour.
+- Upload/packet judge routes: `5` requests per IP per hour.
+- Expensive batch routes such as evaluation, ablation, live drift, judge agreement, and reports: `3` requests per IP per hour.
+
+Set `CLARA_DEMO_KEY` only on the backend when you want a private bypass for your own demo recording. Requests that include `x-clara-demo-key: <key>` skip the limiter. Do not expose that key through `NEXT_PUBLIC_*` frontend variables.
 
 Frontend variables:
 
