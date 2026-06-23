@@ -15,7 +15,9 @@ from loan_pipeline.graph.state import LoanCase
 PROJECT_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = PROJECT_ROOT.parent
 SBA_LOANS_CSV = PROJECT_ROOT / "data" / "sba_loans.csv"
+WEEK4_SBA_LOANS_CSV = PROJECT_ROOT / "data" / "week4_sba_loans.csv"
 GOLD_SET_JSON = PROJECT_ROOT / "eval" / "gold_set.json"
+WEEK4_GOLD_SET_JSON = PROJECT_ROOT / "eval" / "week4_gold_set.json"
 
 load_dotenv(REPO_ROOT / ".env")
 

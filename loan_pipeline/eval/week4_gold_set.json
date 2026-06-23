@@ -1,0 +1,76 @@
+{
+  "description": "50-case Week 4 evaluation gold set for CLARA. It preserves the original 30-case Week 3 set and adds 20 Week 4 cases: 10 edge cases, 5 known-failure probes, and 5 adversarial robustness cases.",
+  "metrics": [
+    "term_extraction_accuracy",
+    "compliance_status_accuracy",
+    "risk_band_accuracy",
+    "escalation_accuracy",
+    "final_outcome_accuracy",
+    "trajectory_correctness",
+    "faithfulness",
+    "latency",
+    "cost"
+  ],
+  "tiers": {
+    "clean": [
+      {"case_id": "CLEAN-001", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-002", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-003", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-004", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-005", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-006", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-007", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-008", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-009", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "CLEAN-010", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"}
+    ],
+    "ambiguous": [
+      {"case_id": "AMB-001", "expected_compliance_status": "FAIL", "expected_risk_band": "MEDIUM", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "AMB-002", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "AMB-003", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "AMB-004", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "AMB-005", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "AMB-006", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "AMB-007", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "AMB-008", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "AMB-009", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "AMB-010", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"}
+    ],
+    "adversarial": [
+      {"case_id": "ADV-001", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-002", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-003", "expected_compliance_status": "FAIL", "expected_risk_band": "MEDIUM", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-004", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-005", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-006", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-007", "expected_compliance_status": "FAIL", "expected_risk_band": "MEDIUM", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-008", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-009", "expected_compliance_status": "FAIL", "expected_risk_band": "MEDIUM", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV-010", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV2-001", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV2-002", "expected_compliance_status": "FAIL", "expected_risk_band": "MEDIUM", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV2-003", "expected_compliance_status": "PASS", "expected_risk_band": "MEDIUM", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV2-004", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "ADV2-005", "expected_compliance_status": "FAIL", "expected_risk_band": "HIGH", "expected_escalation": true, "expected_outcome": "ESCALATE"}
+    ],
+    "edge": [
+      {"case_id": "EDGE-001", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "EDGE-002", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "EDGE-003", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "EDGE-004", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "EDGE-005", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "EDGE-006", "expected_compliance_status": "PASS", "expected_risk_band": "LOW", "expected_escalation": false, "expected_outcome": "APPROVE"},
+      {"case_id": "EDGE-007", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "EDGE-008", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "EDGE-009", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "EDGE-010", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"}
+    ],
+    "known_failure": [
+      {"case_id": "KF-001", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "KF-002", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "KF-003", "expected_compliance_status": "FAIL", "expected_risk_band": "MEDIUM", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "KF-004", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"},
+      {"case_id": "KF-005", "expected_compliance_status": "FAIL", "expected_risk_band": "LOW", "expected_escalation": true, "expected_outcome": "ESCALATE"}
+    ]
+  }
+}

@@ -39,11 +39,12 @@ def score_case(loan_case: LoanCase, packet: ReviewPacket, gold: GoldLabel) -> Ca
 
 
 def summarize_scores(scores: list[CaseScore]) -> dict[str, object]:
+    tiers = list(dict.fromkeys(score.tier for score in scores))
     return {
         "overall": _summarize_group(scores),
         "by_tier": {
             tier: _summarize_group([score for score in scores if score.tier == tier])
-            for tier in ["clean", "ambiguous", "adversarial"]
+            for tier in tiers
         },
     }
 

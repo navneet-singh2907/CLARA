@@ -15,9 +15,11 @@ ProgressCallback = Callable[[int, int, str], None]
 
 def run_eval(
     gold_path: Path = GOLD_SET_JSON,
+    cases_path: Path | None = None,
     progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
-    cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
+    cases_source = load_sba_demo_cases(cases_path) if cases_path else load_sba_demo_cases()
+    cases = {loan_case.case_id: loan_case for loan_case in cases_source}
     gold_labels = load_gold_labels(gold_path)
     total_cases = len(gold_labels)
 
