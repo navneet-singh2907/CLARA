@@ -30,6 +30,18 @@ Files:
 - `loan_pipeline/eval/week4_gold_set.json`
 - `loan_pipeline/eval/week4_dataset.py`
 
+Local export command:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\week4_export_dataset.py
+```
+
+LangSmith upload command:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\week4_upload_dataset.py
+```
+
 ## Metrics
 
 | Metric | Evaluator type | Why it matters |
@@ -84,6 +96,18 @@ The baseline run uses the current CLARA behavior before improvements. It should 
 - Representative LangSmith trace per failure cluster
 - p50/p95 latency
 - cost per run
+
+Local baseline command:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\week4_run_baseline.py
+```
+
+Live LLM + LangSmith tracing command:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\week4_run_baseline.py --live --log-langsmith
+```
 
 ## Failure Taxonomy
 

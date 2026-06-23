@@ -6,6 +6,7 @@ from loan_pipeline.config import WEEK4_GOLD_SET_JSON, WEEK4_SBA_LOANS_CSV, load_
 from loan_pipeline.eval.run_eval import load_gold_labels, run_eval
 from loan_pipeline.eval.week4_dataset import build_week4_dataset_records, export_week4_dataset_jsonl
 from loan_pipeline.eval.week4_evaluators import evaluate_case
+from loan_pipeline.eval.week4_experiment import run_week4_baseline_experiment
 
 
 def test_week4_dataset_has_50_cases_with_required_split() -> None:
@@ -59,3 +60,17 @@ def test_week4_trajectory_evaluator_checks_graph_path() -> None:
     assert result["trajectory"]["trajectory_correct"] is True
     assert result["trajectory"]["parallel_specialist_review_seen"] is True
     assert result["trust_risk"]["should_not_auto_approve"] is True
+
+
+def test_week4_baseline_experiment_writes_local_artifacts(tmp_path) -> None:
+    output_path = tmp_path / "baseline.json"
+    report_path = tmp_path / "baseline.md"
+
+    artifact = run_week4_baseline_experiment(output_path=output_path, report_path=report_path)
+
+    assert output_path.exists()
+    assert report_path.exists()
+    assert artifact["experiment"]["case_count"] == 50
+    assert artifact["summary"]["accuracy"]["overall"]["cases"] == 50
+    assert "trajectory_correct_rate" in artifact["summary"]
+    assert "CLARA Week 4 Baseline Evaluation" in report_path.read_text(encoding="utf-8")
