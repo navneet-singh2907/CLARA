@@ -30,6 +30,14 @@ If CLARA separates missing-document compliance blockers from credit-risk repayme
 | New failures introduced | 0 | none |
 | Persisting failures | 0 | none |
 
+## Resolved Failure Attribution
+
+| Case | Original responsible agent | Failure mode | Expected | Actual |
+| --- | --- | --- | --- | --- |
+| AMB-003 | Review Synthesizer / Orchestrator | behavioral_misclassification | Outcome APPROVE; escalation False | Outcome APPROVE; escalation True |
+| ADV2-003 | Compliance Checker Agent | behavioral_misclassification | Compliance status PASS | Compliance status REVIEW |
+| KF-003 | Credit Risk Scorer Agent | behavioral_misclassification | Risk band MEDIUM | Risk band LOW |
+
 ## Failure Clusters
 
 | Cluster | Baseline | Improved | Delta |

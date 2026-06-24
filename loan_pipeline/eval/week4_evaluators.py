@@ -3,6 +3,7 @@
 from dataclasses import asdict
 from typing import Any
 
+from loan_pipeline.eval.failure_attribution import attribute_failure
 from loan_pipeline.eval.metrics import GoldLabel, score_case
 from loan_pipeline.graph.orchestrator import run_pipeline_with_state
 from loan_pipeline.graph.state import LoanCase, ReviewPacket
@@ -25,12 +26,20 @@ def evaluate_case(loan_case: LoanCase, gold: GoldLabel) -> dict[str, Any]:
     exact_scores = exact_match_scores(loan_case, packet, gold)
     trajectory = trajectory_score(state["execution_trace"])
     trust = trust_risk_flags(packet)
+    failure_attribution = attribute_failure(
+        loan_case=loan_case,
+        packet=packet,
+        gold=gold,
+        exact_match=exact_scores,
+        execution_trace=state["execution_trace"],
+    )
     return {
         "case_id": loan_case.case_id,
         "tier": gold.tier,
         "exact_match": exact_scores,
         "trajectory": trajectory,
         "trust_risk": trust,
+        "failure_attribution": failure_attribution,
         "packet": _packet_summary(packet),
     }
 

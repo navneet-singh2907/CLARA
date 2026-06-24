@@ -3,6 +3,8 @@ src/
 __pycache__/
 *.pyc
 .env
+.env.local
+web/.env.local
 .pytest_cache/
 .ruff_cache/
 .streamlit/secrets.toml

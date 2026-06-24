@@ -5,6 +5,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from loan_pipeline.eval.failure_attribution import primary_attribution
 from loan_pipeline.eval.week4_experiment import DEFAULT_BASELINE_PATH
 
 DEFAULT_WEEK4_REPORT_PATH = Path("docs") / "week4_baseline_report.md"
@@ -107,8 +108,8 @@ def render_week4_baseline_report(artifact: dict[str, Any]) -> str:
             f"- Weakest tier: {weakest_tier}",
             f"- Failure clusters: {_format_counter(summary['failure_counts'])}",
             "",
-            "| Case | Tier | Failure category | Observed packet | Why it matters |",
-            "| --- | --- | --- | --- | --- |",
+            "| Case | Tier | Responsible agent | Failure mode | Expected | Actual | Downstream impact |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ]
     )
 
@@ -117,9 +118,11 @@ def render_week4_baseline_report(artifact: dict[str, Any]) -> str:
             "| "
             f"{row['case_id']} | "
             f"{row['tier']} | "
-            f"{row['category']} | "
-            f"{row['observed']} | "
-            f"{row['why_it_matters']} |"
+            f"{row['responsible_agent']} | "
+            f"{row['failure_mode']} | "
+            f"{row['expected']} | "
+            f"{row['actual']} | "
+            f"{row['downstream_impact']} |"
         )
 
     lines.extend(
@@ -185,43 +188,19 @@ def _failure_rows(results: list[dict[str, Any]]) -> list[dict[str, str]]:
         exact = result["exact_match"]
         if all(exact.values()):
             continue
-        packet = result["packet"]
+        attribution = primary_attribution(result)
         rows.append(
             {
                 "case_id": result["case_id"],
                 "tier": result["tier"],
-                "category": _failure_category(exact),
-                "observed": (
-                    f"{packet['outcome']} / {packet['risk_band']} / "
-                    f"{packet['compliance_status']}"
-                ),
-                "why_it_matters": _failure_interpretation(result),
+                "responsible_agent": attribution["responsible_agent"],
+                "failure_mode": attribution["failure_mode"],
+                "expected": attribution["expected"],
+                "actual": attribution["actual"],
+                "downstream_impact": attribution["downstream_impact"],
             }
         )
     return rows
-
-
-def _failure_category(exact: dict[str, bool]) -> str:
-    if not exact["term_extraction_correct"]:
-        return "Extraction failure"
-    if not exact["compliance_correct"]:
-        return "Compliance failure"
-    if not exact["risk_correct"]:
-        return "Risk calibration failure"
-    if not exact["escalation_correct"] or not exact["outcome_correct"]:
-        return "Orchestration failure"
-    return "Uncategorized"
-
-
-def _failure_interpretation(result: dict[str, Any]) -> str:
-    exact = result["exact_match"]
-    if not exact["compliance_correct"]:
-        return "Adversarial or malformed input was not classified with the expected compliance severity."
-    if not exact["risk_correct"]:
-        return "Credit-risk severity did not match the gold label despite correct escalation."
-    if not exact["escalation_correct"]:
-        return "Human-review gate fired differently from the gold label."
-    return "Output differs from the gold packet and needs manual review."
 
 
 def _tier_extremes(by_tier: dict[str, dict[str, float | int]]) -> tuple[str, str]:

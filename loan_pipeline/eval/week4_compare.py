@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from loan_pipeline.eval.failure_attribution import primary_attribution
 from loan_pipeline.eval.week4_experiment import DEFAULT_BASELINE_PATH
 
 DEFAULT_IMPROVED_PATH = Path("output") / "week4" / "clara_week4_improved.json"
@@ -76,6 +77,26 @@ def render_week4_improvement_report(
             f"| Resolved baseline failures | {len(failure_delta['resolved'])} | {_case_list(failure_delta['resolved'])} |",
             f"| New failures introduced | {len(failure_delta['introduced'])} | {_case_list(failure_delta['introduced'])} |",
             f"| Persisting failures | {len(failure_delta['persisting'])} | {_case_list(failure_delta['persisting'])} |",
+            "",
+            "## Resolved Failure Attribution",
+            "",
+            "| Case | Original responsible agent | Failure mode | Expected | Actual |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+
+    for row in _resolved_failure_rows(baseline, failure_delta["resolved"]):
+        lines.append(
+            "| "
+            f"{row['case_id']} | "
+            f"{row['responsible_agent']} | "
+            f"{row['failure_mode']} | "
+            f"{row['expected']} | "
+            f"{row['actual']} |"
+        )
+
+    lines.extend(
+        [
             "",
             "## Failure Clusters",
             "",
@@ -217,6 +238,28 @@ def _failure_delta(
         "introduced": sorted(after - before),
         "persisting": sorted(before & after),
     }
+
+
+def _resolved_failure_rows(
+    baseline: dict[str, Any],
+    resolved_case_ids: list[str],
+) -> list[dict[str, str]]:
+    resolved = set(resolved_case_ids)
+    rows = []
+    for result in baseline["results"]:
+        if result["case_id"] not in resolved:
+            continue
+        attribution = primary_attribution(result)
+        rows.append(
+            {
+                "case_id": result["case_id"],
+                "responsible_agent": attribution["responsible_agent"],
+                "failure_mode": attribution["failure_mode"],
+                "expected": attribution["expected"],
+                "actual": attribution["actual"],
+            }
+        )
+    return rows
 
 
 def _failed_case_ids(results: list[dict[str, Any]]) -> set[str]:

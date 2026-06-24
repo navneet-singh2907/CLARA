@@ -9,7 +9,7 @@ The UI connects to the FastAPI backend through `NEXT_PUBLIC_API_BASE_URL` and di
 Start the Python API in one terminal:
 
 ```powershell
-cd C:\Users\nsingh1\CLARA
+cd C:\Users\navni\CLARA
 .\.venv\Scripts\Activate.ps1
 .\.venv\Scripts\python.exe -m uvicorn loan_pipeline.api.app:app --host 127.0.0.1 --port 8000 --reload
 ```
@@ -17,9 +17,8 @@ cd C:\Users\nsingh1\CLARA
 Start the Next.js app in another terminal:
 
 ```powershell
-cd C:\Users\nsingh1\CLARA\web
+cd C:\Users\navni\CLARA\web
 npm.cmd install
-$env:NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:8000"
 npm.cmd run dev
 ```
 

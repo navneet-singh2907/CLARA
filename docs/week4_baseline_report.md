@@ -53,11 +53,11 @@ The important finding is not that the system is perfect. It is that the evaluati
 - Weakest tier: known_failure
 - Failure clusters: Orchestration Failure: 1, Compliance Failure: 1, Risk Calibration Failure: 1
 
-| Case | Tier | Failure category | Observed packet | Why it matters |
-| --- | --- | --- | --- | --- |
-| AMB-003 | ambiguous | Orchestration failure | APPROVE / LOW / PASS | Human-review gate fired differently from the gold label. |
-| ADV2-003 | adversarial | Compliance failure | CONDITIONAL_REVIEW / MEDIUM / REVIEW | Adversarial or malformed input was not classified with the expected compliance severity. |
-| KF-003 | known_failure | Risk calibration failure | ESCALATE / LOW / FAIL | Credit-risk severity did not match the gold label despite correct escalation. |
+| Case | Tier | Responsible agent | Failure mode | Expected | Actual | Downstream impact |
+| --- | --- | --- | --- | --- | --- | --- |
+| AMB-003 | ambiguous | Review Synthesizer / Orchestrator | behavioral_misclassification | Outcome APPROVE; escalation False | Outcome APPROVE; escalation True | Specialist agents were correct, but the orchestration gate produced the wrong action for the human reviewer. |
+| ADV2-003 | adversarial | Compliance Checker Agent | behavioral_misclassification | Compliance status PASS | Compliance status REVIEW | The review synthesizer may choose the wrong review path because the compliance status is misclassified. |
+| KF-003 | known_failure | Credit Risk Scorer Agent | behavioral_misclassification | Risk band MEDIUM | Risk band LOW | The final packet may understate or overstate repayment severity and counterfactual guidance. |
 
 ## Trust And Safety Signals
 
