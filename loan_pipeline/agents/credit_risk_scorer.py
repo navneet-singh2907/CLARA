@@ -60,6 +60,19 @@ def run_credit_risk_scorer_deterministic(
             "High-dollar loan request from a sub-1-year business is elevated risk."
         )
 
+    if (
+        "customer_contracts" in terms.missing_documents
+        and terms.loan_amount >= 700_000
+        and terms.borrower_credit_score is not None
+        and terms.borrower_credit_score < 680
+        and terms.years_in_business is not None
+        and terms.years_in_business < 2.0
+    ):
+        points += 1
+        primary_risk_factors.append(
+            "Large request depends on unverified customer contracts from a young business."
+        )
+
     if terms.jobs_supported >= 10:
         mitigating_factors.append("Application supports at least ten jobs.")
 

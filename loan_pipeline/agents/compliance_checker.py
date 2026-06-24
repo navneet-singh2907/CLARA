@@ -38,7 +38,7 @@ def run_compliance_checker_deterministic(
             )
         )
 
-    if terms.borrower_credit_score is None:
+    if terms.borrower_credit_score is None and not _is_non_loan_or_irrelevant_input(terms):
         findings.append(
             ComplianceFinding(
                 rule_id="KYC-001",
@@ -74,3 +74,14 @@ def run_compliance_checker_deterministic(
     confidence = 0.90 if findings else 0.95
 
     return ComplianceResult(status=status, findings=findings, confidence=confidence)
+
+
+def _is_non_loan_or_irrelevant_input(terms: ExtractedTerms) -> bool:
+    """Treat obviously non-loan text as intake quality risk, not a KYC violation."""
+    return (
+        terms.naics_code == "000000"
+        and not terms.missing_documents
+        and not terms.prior_default
+        and terms.borrower_credit_score is None
+        and terms.years_in_business is None
+    )

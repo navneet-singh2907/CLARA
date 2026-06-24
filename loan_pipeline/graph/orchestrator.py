@@ -311,7 +311,7 @@ def synthesize_review_packet(
     if risk.band == "HIGH":
         human_review_notes.append("High credit risk requires loan officer review.")
 
-    if terms.confidence < 0.80:
+    if _requires_extraction_confidence_review(terms):
         human_review_notes.append("Extraction confidence is below target threshold.")
 
     if contradictions:
@@ -319,7 +319,14 @@ def synthesize_review_packet(
 
     escalation_required = bool(human_review_notes)
 
-    if validation_errors or contradictions or compliance.status == "FAIL" or risk.band == "HIGH":
+    if (
+        validation_errors
+        or contradictions
+        or compliance.status == "FAIL"
+        or risk.band == "HIGH"
+        or terms.confidence < 0.60
+        or _is_non_loan_or_irrelevant_input(terms)
+    ):
         recommended_outcome = "ESCALATE"
     elif compliance.status == "REVIEW" or risk.band == "MEDIUM":
         recommended_outcome = "CONDITIONAL_REVIEW"
@@ -343,4 +350,26 @@ def synthesize_review_packet(
         human_review_notes=human_review_notes,
         contradictions=contradictions,
         counterfactuals=counterfactuals,
+    )
+
+
+def _requires_extraction_confidence_review(terms: ExtractedTerms) -> bool:
+    if terms.confidence >= 0.80:
+        return False
+    if terms.confidence < 0.60:
+        return True
+    return bool(
+        terms.missing_documents
+        or terms.borrower_credit_score is None
+        or terms.years_in_business is None
+    )
+
+
+def _is_non_loan_or_irrelevant_input(terms: ExtractedTerms) -> bool:
+    return (
+        terms.naics_code == "000000"
+        and not terms.missing_documents
+        and not terms.prior_default
+        and terms.borrower_credit_score is None
+        and terms.years_in_business is None
     )
