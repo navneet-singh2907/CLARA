@@ -41,7 +41,7 @@ def extract_terms_with_llm(loan_case: LoanCase) -> ExtractedTerms:
         ),
         prior_default=bool(payload["prior_default"]),
         missing_documents=list(payload.get("missing_documents") or []),
-        confidence=float(payload["confidence"]),
+        confidence=_coerce_confidence(payload.get("confidence"), default=0.80),
         warnings=list(payload.get("warnings") or []),
     )
 
@@ -144,3 +144,28 @@ def _parse_json_content(content: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("LLM response JSON must be an object.")
     return payload
+
+
+def _coerce_confidence(value: Any, default: float) -> float:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        label_scores = {
+            "very high": 0.95,
+            "high": 0.90,
+            "medium": 0.75,
+            "moderate": 0.75,
+            "low": 0.55,
+            "very low": 0.35,
+        }
+        if normalized in label_scores:
+            return label_scores[normalized]
+        value = normalized
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return default
+    if confidence > 1:
+        confidence = confidence / 100
+    return min(max(confidence, 0.0), 1.0)

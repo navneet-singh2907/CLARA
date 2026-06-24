@@ -2,6 +2,7 @@
 
 import json
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,26 +29,41 @@ def run_week4_baseline_experiment(
     output_path: Path = DEFAULT_BASELINE_PATH,
     report_path: Path = DEFAULT_MARKDOWN_PATH,
     use_live_runtime: bool = False,
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> dict[str, Any]:
     """Run CLARA across the 50-case Week 4 set and write local artifacts."""
     if not use_live_runtime:
         with offline_evaluation_context():
-            return _run_week4_baseline_experiment(output_path, report_path, use_live_runtime)
+            return _run_week4_baseline_experiment(
+                output_path,
+                report_path,
+                use_live_runtime,
+                progress_callback,
+            )
 
-    return _run_week4_baseline_experiment(output_path, report_path, use_live_runtime)
+    return _run_week4_baseline_experiment(
+        output_path,
+        report_path,
+        use_live_runtime,
+        progress_callback,
+    )
 
 
 def _run_week4_baseline_experiment(
     output_path: Path,
     report_path: Path,
     use_live_runtime: bool,
+    progress_callback: Callable[[int, int, str], None] | None,
 ) -> dict[str, Any]:
     cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases(WEEK4_SBA_LOANS_CSV)}
     labels = load_gold_labels(WEEK4_GOLD_SET_JSON)
 
     results = []
     latencies_ms = []
-    for label in labels:
+    total_cases = len(labels)
+    for index, label in enumerate(labels, start=1):
+        if progress_callback:
+            progress_callback(index - 1, total_cases, label.case_id)
         loan_case = cases[label.case_id]
         started_at = perf_counter()
         result = evaluate_case(loan_case, label)
@@ -56,6 +72,7 @@ def _run_week4_baseline_experiment(
         result["gold"] = asdict(label)
         results.append(result)
         latencies_ms.append(latency_ms)
+        _write_partial_results(output_path, results, total_cases, use_live_runtime)
 
     artifact = {
         "experiment": {
@@ -76,7 +93,30 @@ def _run_week4_baseline_experiment(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
     report_path.write_text(render_week4_baseline_markdown(artifact), encoding="utf-8")
+    if progress_callback:
+        progress_callback(total_cases, total_cases, "complete")
     return artifact
+
+
+def _write_partial_results(
+    output_path: Path,
+    results: list[dict[str, Any]],
+    total_cases: int,
+    use_live_runtime: bool,
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    partial_path = output_path.with_suffix(".partial.json")
+    partial_payload = {
+        "experiment": {
+            "name": "CLARA Week 4 Baseline",
+            "runtime": "live_llm" if use_live_runtime else "offline_reproducible",
+            "completed_cases": len(results),
+            "total_cases": total_cases,
+            "updated_at": datetime.now(UTC).isoformat(),
+        },
+        "results": results,
+    }
+    partial_path.write_text(json.dumps(partial_payload, indent=2), encoding="utf-8")
 
 
 def _summarize_experiment(

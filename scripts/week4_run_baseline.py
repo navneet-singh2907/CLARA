@@ -15,6 +15,10 @@ from loan_pipeline.eval.week4_experiment import (
 )
 
 
+def _print_progress(completed: int, total: int, current_case: str) -> None:
+    print(f"[{completed}/{total}] current={current_case}", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run CLARA's Week 4 baseline eval.")
     parser.add_argument(
@@ -29,7 +33,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    artifact = run_week4_baseline_experiment(use_live_runtime=args.live)
+    artifact = run_week4_baseline_experiment(
+        use_live_runtime=args.live,
+        progress_callback=_print_progress,
+    )
     print(json.dumps(artifact["summary"], indent=2))
     print(f"JSON artifact: {DEFAULT_BASELINE_PATH}")
     print(f"Markdown report: {DEFAULT_MARKDOWN_PATH}")
