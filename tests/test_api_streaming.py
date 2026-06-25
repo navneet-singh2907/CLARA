@@ -4,6 +4,7 @@ import json
 
 from fastapi.testclient import TestClient
 
+import loan_pipeline.api.app as api_app
 from loan_pipeline.api.app import app
 from loan_pipeline.api.rate_limit import reset_rate_limits
 from loan_pipeline.api.streaming import (
@@ -328,6 +329,43 @@ def test_api_review_document_endpoint() -> None:
     assert pdf_response.status_code == 200
     assert pdf_response.headers["content-type"] == "application/pdf"
     assert pdf_response.content.startswith(b"%PDF")
+
+
+def test_api_review_document_rejects_oversized_upload(monkeypatch) -> None:
+    monkeypatch.setattr(api_app, "MAX_UPLOAD_BYTES", 20)
+    client = TestClient(app)
+
+    response = client.post(
+        "/review/document",
+        data={"policy": "sba_reviewer"},
+        files={"file": ("large.txt", b"x" * 21, "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert "too large" in response.json()["detail"]
+
+
+def test_api_review_document_rejects_missing_required_fields() -> None:
+    client = TestClient(app)
+    document = "\n".join(
+        [
+            "Borrower: Missing Fields LLC",
+            "Industry: Retail bakery",
+            "This upload intentionally omits loan amount and term.",
+        ]
+    )
+
+    response = client.post(
+        "/review/document",
+        data={"policy": "sba_reviewer"},
+        files={"file": ("missing_fields.txt", document.encode("utf-8"), "text/plain")},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["message"] == "Uploaded loan document is missing required structured fields."
+    assert "loan amount" in detail["missing_fields"]
+    assert "loan term" in detail["missing_fields"]
 
 
 def _event_payload(raw_event: str) -> dict:

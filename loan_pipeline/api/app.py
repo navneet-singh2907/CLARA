@@ -83,6 +83,13 @@ CASE_ID_QUERY = Query(..., description="Gold-set case ID, for example ADV-001.")
 POLICY_QUERY = Query("sba_reviewer", description="Reviewer policy profile.")
 DOCUMENT_FILE = File(...)
 DOCUMENT_POLICY = Form("sba_reviewer")
+MAX_UPLOAD_BYTES = 10_000_000
+REQUIRED_UPLOAD_FIELDS = {
+    "borrower_name": "borrower/company name",
+    "loan_amount": "loan amount",
+    "term_months": "loan term",
+    "jobs_supported": "jobs supported",
+}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -378,6 +385,11 @@ def _review_packet_audit_targets(packet) -> list[str]:
 
 async def _extract_upload_text(file: UploadFile) -> str:
     content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Uploaded file is too large. Maximum supported size is {MAX_UPLOAD_BYTES // 1_000_000} MB.",
+        )
     file_name = (file.filename or "").lower()
     if file_name.endswith(".pdf") or file.content_type == "application/pdf":
         import pdfplumber
@@ -389,7 +401,9 @@ async def _extract_upload_text(file: UploadFile) -> str:
 
 def _parse_uploaded_loan_case(document_text: str) -> LoanCase:
     try:
-        return parse_document_to_loan_case(document_text)
+        return _validate_uploaded_loan_case(parse_document_to_loan_case(document_text))
+    except HTTPException:
+        raise
     except Exception:
         return _parse_uploaded_loan_case_fallback(document_text)
 
@@ -416,7 +430,7 @@ def _parse_uploaded_loan_case_fallback(document_text: str) -> LoanCase:
         if item.strip() and item.strip().lower() != "none"
     ]
 
-    return LoanCase(
+    return _validate_uploaded_loan_case(LoanCase(
         case_id=case_id,
         borrower_name=borrower or "Uploaded Borrower",
         industry=industry or "Uploaded loan application",
@@ -431,7 +445,32 @@ def _parse_uploaded_loan_case_fallback(document_text: str) -> LoanCase:
         missing_documents=missing_documents,
         notes="Parsed from uploaded document with deterministic fallback extraction.",
         difficulty_tier="uploaded",
-    )
+    ))
+
+
+def _validate_uploaded_loan_case(loan_case: LoanCase) -> LoanCase:
+    missing_fields = []
+    if not loan_case.borrower_name.strip() or loan_case.borrower_name in {
+        "Unknown Borrower",
+        "Uploaded Borrower",
+    }:
+        missing_fields.append(REQUIRED_UPLOAD_FIELDS["borrower_name"])
+    if loan_case.loan_amount <= 0:
+        missing_fields.append(REQUIRED_UPLOAD_FIELDS["loan_amount"])
+    if loan_case.term_months <= 0:
+        missing_fields.append(REQUIRED_UPLOAD_FIELDS["term_months"])
+    if loan_case.jobs_supported < 0:
+        missing_fields.append(REQUIRED_UPLOAD_FIELDS["jobs_supported"])
+
+    if missing_fields:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Uploaded loan document is missing required structured fields.",
+                "missing_fields": missing_fields,
+            },
+        )
+    return loan_case
 
 
 def _match_text(text: str, pattern: str) -> str:
