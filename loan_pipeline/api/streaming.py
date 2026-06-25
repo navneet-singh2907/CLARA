@@ -54,6 +54,17 @@ def stream_review_events(
         for chunk in graph.stream(initial_state(loan_case, review_policy=review_policy)):
             for node, update in chunk.items():
                 for trace_entry in update.get("execution_trace", []):
+                    if trace_entry.status == "ERROR":
+                        yield sse_event(
+                            "agent_failed",
+                            {
+                                "node": trace_entry.node,
+                                "stage": trace_entry.stage,
+                                "parallel_group": trace_entry.parallel_group,
+                                "duration_ms": trace_entry.duration_ms,
+                                "status": trace_entry.status,
+                            },
+                        )
                     yield sse_event(
                         "agent_completed",
                         {

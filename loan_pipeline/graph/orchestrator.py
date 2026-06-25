@@ -18,6 +18,7 @@ from loan_pipeline.graph.edges import (
     VALIDATOR,
 )
 from loan_pipeline.graph.state import (
+    ComplianceFinding,
     ComplianceResult,
     ContradictionResult,
     CounterfactualResult,
@@ -118,7 +119,7 @@ def compliance_checker_node(state: GraphState) -> GraphState:
     review_policy = state["review_policy"]
     if terms is None:
         return {
-            "agent_errors": [*state["agent_errors"], "Compliance checker missing terms."],
+            "agent_errors": ["Compliance checker missing terms."],
             "execution_trace": [
                 _trace_entry(
                     node=COMPLIANCE_CHECKER,
@@ -129,8 +130,8 @@ def compliance_checker_node(state: GraphState) -> GraphState:
                 )
             ],
         }
-    return {
-        "compliance": trace_call(
+    try:
+        compliance = trace_call(
             name="Compliance Checker Agent",
             run_type="chain",
             func=run_compliance_checker,
@@ -141,16 +142,33 @@ def compliance_checker_node(state: GraphState) -> GraphState:
                 "review_policy": review_policy,
             },
             tags=["agent", "compliance", "parallel-specialist-review"],
-        ),
-        "execution_trace": [
-            _trace_entry(
-                node=COMPLIANCE_CHECKER,
-                stage="parallel_specialist_review",
-                parallel_group="specialist_review",
-                started_at=started_at,
-            )
-        ],
-    }
+        )
+        return {
+            "compliance": compliance,
+            "execution_trace": [
+                _trace_entry(
+                    node=COMPLIANCE_CHECKER,
+                    stage="parallel_specialist_review",
+                    parallel_group="specialist_review",
+                    started_at=started_at,
+                )
+            ],
+        }
+    except Exception as exc:
+        error_message = f"Compliance checker failed: {exc}"
+        return {
+            "compliance": _fallback_compliance_result(error_message),
+            "agent_errors": [error_message],
+            "execution_trace": [
+                _trace_entry(
+                    node=COMPLIANCE_CHECKER,
+                    stage="parallel_specialist_review",
+                    parallel_group="specialist_review",
+                    started_at=started_at,
+                    status="ERROR",
+                )
+            ],
+        }
 
 
 def credit_risk_scorer_node(state: GraphState) -> GraphState:
@@ -159,7 +177,7 @@ def credit_risk_scorer_node(state: GraphState) -> GraphState:
     review_policy = state["review_policy"]
     if terms is None:
         return {
-            "agent_errors": [*state["agent_errors"], "Credit risk scorer missing terms."],
+            "agent_errors": ["Credit risk scorer missing terms."],
             "execution_trace": [
                 _trace_entry(
                     node=CREDIT_RISK_SCORER,
@@ -170,8 +188,8 @@ def credit_risk_scorer_node(state: GraphState) -> GraphState:
                 )
             ],
         }
-    return {
-        "risk": trace_call(
+    try:
+        risk = trace_call(
             name="Credit Risk Scorer Agent",
             run_type="chain",
             func=run_credit_risk_scorer,
@@ -182,16 +200,33 @@ def credit_risk_scorer_node(state: GraphState) -> GraphState:
                 "review_policy": review_policy,
             },
             tags=["agent", "credit-risk", "parallel-specialist-review"],
-        ),
-        "execution_trace": [
-            _trace_entry(
-                node=CREDIT_RISK_SCORER,
-                stage="parallel_specialist_review",
-                parallel_group="specialist_review",
-                started_at=started_at,
-            )
-        ],
-    }
+        )
+        return {
+            "risk": risk,
+            "execution_trace": [
+                _trace_entry(
+                    node=CREDIT_RISK_SCORER,
+                    stage="parallel_specialist_review",
+                    parallel_group="specialist_review",
+                    started_at=started_at,
+                )
+            ],
+        }
+    except Exception as exc:
+        error_message = f"Credit risk scorer failed: {exc}"
+        return {
+            "risk": _fallback_risk_result(error_message),
+            "agent_errors": [error_message],
+            "execution_trace": [
+                _trace_entry(
+                    node=CREDIT_RISK_SCORER,
+                    stage="parallel_specialist_review",
+                    parallel_group="specialist_review",
+                    started_at=started_at,
+                    status="ERROR",
+                )
+            ],
+        }
 
 
 def synthesizer_node(state: GraphState) -> GraphState:
@@ -212,7 +247,6 @@ def synthesizer_node(state: GraphState) -> GraphState:
     if missing_outputs:
         return {
             "agent_errors": [
-                *state["agent_errors"],
                 f"Synthesizer missing required outputs: {', '.join(missing_outputs)}.",
             ],
             "execution_trace": [
@@ -235,6 +269,7 @@ def synthesizer_node(state: GraphState) -> GraphState:
             "compliance": compliance,
             "risk": risk,
             "validation_errors": state["validation_errors"],
+            "agent_errors": state["agent_errors"],
             "review_policy": review_policy,
         },
         metadata={"case_id": terms.case_id, "stage": "synthesis", "review_policy": review_policy},
@@ -278,9 +313,11 @@ def synthesize_review_packet(
     compliance: ComplianceResult,
     risk: RiskResult,
     validation_errors: list[str],
+    agent_errors: list[str] | None = None,
     review_policy: ReviewPolicy = "sba_reviewer",
 ) -> ReviewPacket:
     human_review_notes: list[str] = []
+    agent_errors = agent_errors or []
     contradictions = [
         ContradictionResult(
             severity=contradiction.severity,
@@ -305,6 +342,9 @@ def synthesize_review_packet(
     if validation_errors:
         human_review_notes.extend(validation_errors)
 
+    if agent_errors:
+        human_review_notes.extend(f"Agent failure: {error}" for error in agent_errors)
+
     if compliance.status == "FAIL":
         human_review_notes.append("Compliance blocker or high-severity finding requires review.")
 
@@ -320,6 +360,8 @@ def synthesize_review_packet(
     escalation_required = bool(human_review_notes)
 
     if (
+        agent_errors
+        or
         validation_errors
         or contradictions
         or compliance.status == "FAIL"
@@ -337,6 +379,8 @@ def synthesize_review_packet(
         f"{terms.borrower_name} is classified as {risk.band} risk with compliance status "
         f"{compliance.status}. Recommended outcome: {recommended_outcome}."
     )
+    if agent_errors:
+        summary += " One or more specialist agents failed, so manual review is required."
 
     return ReviewPacket(
         case_id=terms.case_id,
@@ -372,4 +416,31 @@ def _is_non_loan_or_irrelevant_input(terms: ExtractedTerms) -> bool:
         and not terms.prior_default
         and terms.borrower_credit_score is None
         and terms.years_in_business is None
+    )
+
+
+def _fallback_compliance_result(error_message: str) -> ComplianceResult:
+    return ComplianceResult(
+        status="REVIEW",
+        findings=[
+            ComplianceFinding(
+                rule_id="AGENT-ERROR",
+                severity="HIGH",
+                description="Compliance review could not complete successfully.",
+                evidence=error_message,
+            )
+        ],
+        confidence=0.0,
+        reviewer_note="Compliance agent failure requires manual review.",
+    )
+
+
+def _fallback_risk_result(error_message: str) -> RiskResult:
+    return RiskResult(
+        score=5,
+        band="HIGH",
+        confidence=0.0,
+        primary_risk_factors=["Credit risk scorer could not complete successfully."],
+        mitigating_factors=[],
+        rationale=f"{error_message}. Manual underwriting review is required.",
     )

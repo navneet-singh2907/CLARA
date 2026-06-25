@@ -5,6 +5,7 @@ import json
 from fastapi.testclient import TestClient
 
 import loan_pipeline.api.app as api_app
+import loan_pipeline.graph.orchestrator as orchestrator
 from loan_pipeline.api.app import app
 from loan_pipeline.api.rate_limit import reset_rate_limits
 from loan_pipeline.api.streaming import (
@@ -57,6 +58,22 @@ def test_review_stream_emits_run_completed() -> None:
     assert any(event.startswith("event: run_started") for event in events)
     assert any(event.startswith("event: agent_completed") for event in events)
     assert any(event.startswith("event: run_completed") for event in events)
+
+
+def test_review_stream_emits_agent_failed_for_specialist_failure(monkeypatch) -> None:
+    def failing_compliance_agent(*args, **kwargs):
+        raise RuntimeError("simulated compliance outage")
+
+    monkeypatch.setattr(orchestrator, "run_compliance_checker", failing_compliance_agent)
+
+    events = list(stream_review_events("CLEAN-001"))
+
+    assert any(event.startswith("event: agent_failed") for event in events)
+    assert any(event.startswith("event: run_completed") for event in events)
+    packet_event = next(event for event in events if event.startswith("event: run_completed"))
+    payload = _event_payload(packet_event)
+    assert payload["outcome"] == "ESCALATE"
+    assert payload["escalation_required"] is True
 
 
 def test_review_stream_reports_unknown_case() -> None:

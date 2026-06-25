@@ -139,7 +139,7 @@ class GraphState(TypedDict):
     contradictions: list[ContradictionResult]
     counterfactuals: list[CounterfactualResult]
     review_packet: ReviewPacket | None
-    agent_errors: list[str]
+    agent_errors: Annotated[list[str], operator.add]
     execution_trace: Annotated[list[ExecutionTraceEntry], operator.add]
 
 
