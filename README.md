@@ -82,6 +82,16 @@ The Week 4 evaluation does not just report a score. It identifies which agent fa
 
 Start here for the complete submission packet: [Week 4 Submission Packet](docs/week4_submission_packet.md).
 
+## Reliability And Safety Hardening
+
+CLARA includes production-style controls for live agent demos:
+
+- LLM calls use a 30-second timeout and structured error context with agent, case, operation, provider, model, temperature, and a sanitized response preview.
+- SSE streams preserve structured failure details and emit explicit `agent_failed` events when a specialist agent fails.
+- Uploaded PDF/text loan documents are size-limited and validated before review.
+- Missing required loan fields return clear `400` responses instead of silently creating weak default cases.
+- If a critical specialist agent fails, CLARA produces a conservative fallback review packet and escalates to human review instead of collapsing the graph.
+
 ## Data Scope
 
 The checked-in data is a curated SBA-style seed set, not a full production SBA corpus. It is designed for reproducible evaluation and contains clean, ambiguous, adversarial, edge-case, and known-failure cases with hand-authored labels. The project includes a public SBA FOIA loader scaffold in `loan_pipeline/data/load_sba_public.py`; expanding the gold set from downloaded SBA Open Data exports is the strongest v2 improvement.

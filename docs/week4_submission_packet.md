@@ -116,7 +116,20 @@ Run quality checks:
 .\.venv\Scripts\python.exe -m ruff check loan_pipeline tests scripts
 ```
 
-## 6. What This Proves
+## 6. Reliability Hardening
+
+CLARA includes reliability controls that make the live agent system easier to debug and safer to demo:
+
+| Control | Why it matters |
+| --- | --- |
+| LLM timeout | Prevents slow provider calls from hanging a live run indefinitely. |
+| Contextual LLM errors | Identifies the failing agent, case, operation, provider, model, and response preview. |
+| Structured SSE errors | Keeps backend failures visible in the live timeline instead of hiding them in generic strings. |
+| Upload size limit | Protects the API from oversized PDF/text uploads. |
+| Uploaded document validation | Rejects incomplete loan packets before they reach the review graph. |
+| Specialist failure recovery | Produces a conservative human-review packet if Compliance or Risk scoring fails. |
+
+## 7. What This Proves
 
 CLARA is not just a loan-review demo. It is an evaluation-driven multi-agent system with:
 
@@ -125,6 +138,7 @@ CLARA is not just a loan-review demo. It is an evaluation-driven multi-agent sys
 - LangSmith traceability,
 - case-level failure attribution,
 - agent-level failure categories,
+- reliability controls for live agent failures,
 - targeted improvement,
 - before/after delta reporting,
 - no-regression evidence.
