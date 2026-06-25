@@ -50,6 +50,38 @@ Current deterministic evaluation results on the controlled SBA-style gold set:
 
 The deterministic benchmark is intentionally controlled: it validates orchestration, scoring contracts, ablations, and UI behavior against a stable 30-case set. The live LLM mode is where non-deterministic agent behavior, primary/secondary judge disagreement, and LangSmith traceability become visible. Confidence calibration remains visible as a separate quality signal even when label accuracy is high.
 
+## Week 4 Evaluation Lab
+
+Week 4 extends CLARA from a 30-case product demo into an evaluation-driven agent improvement lab. The controlled test set now contains 50 SBA-style cases split across clean, ambiguous, adversarial, edge-case, and known-failure scenarios.
+
+LangSmith evidence:
+
+- Dataset: `ec7896af-7117-4f7e-8972-0dc37239036a`
+- Project: `CLARA Week 4 Eval Lab`
+
+Baseline live run:
+
+| Metric | Result |
+| --- | ---: |
+| Final outcome accuracy | 98.00% |
+| Compliance accuracy | 98.00% |
+| Risk band accuracy | 98.00% |
+| Failures | 3 |
+
+Targeted improvement run:
+
+| Metric | Result |
+| --- | ---: |
+| Final outcome accuracy | 100.00% |
+| Compliance accuracy | 100.00% |
+| Risk band accuracy | 100.00% |
+| Failures | 0 |
+| Regressions | 0 |
+
+The Week 4 evaluation does not just report a score. It identifies which agent failed, applies one targeted calibration fix, re-runs the same dataset, and documents the before/after delta.
+
+Start here for the complete submission packet: [Week 4 Submission Packet](docs/week4_submission_packet.md).
+
 ## Data Scope
 
 The checked-in data is a curated SBA-style seed set, not a full production SBA corpus. It is designed for reproducible evaluation and contains clean, ambiguous, and adversarial cases with hand-authored labels. The project includes a public SBA FOIA loader scaffold in `loan_pipeline/data/load_sba_public.py`; expanding the gold set from downloaded SBA Open Data exports is the strongest v2 improvement.
@@ -167,6 +199,10 @@ docker-compose.yml
 - [Architecture](docs/architecture.md)
 - [System Architecture Diagrams](docs/system_architecture.md)
 - [Evaluation Plan](docs/evaluation_plan.md)
+- [Week 4 Submission Packet](docs/week4_submission_packet.md)
+- [Week 4 Submission](docs/week4_submission.md)
+- [Week 4 Baseline Report](docs/week4_baseline_report.md)
+- [Week 4 Improvement Report](docs/week4_improvement_report.md)
 - [Data Source Notes](docs/data_source.md)
 - [Deployment Guide](DEPLOYMENT.md)
 - [Demo Script](docs/demo_script.md)
