@@ -9,9 +9,9 @@ Live link - https://clara-web-beta.vercel.app/
 
 ## Portfolio Summary
 
-This project treats agentic AI as a high-stakes financial decision-support workflow rather than a simple automation demo. A LangGraph orchestrator coordinates specialist agents for term extraction, compliance review, and credit risk scoring. The system then surfaces contradictions, generates counterfactual explanations, supports reviewer policy modes, logs human overrides, exports a PDF review packet, and evaluates performance against a structured 30-case SBA-style gold set.
+This project treats agentic AI as a high-stakes financial decision-support workflow rather than a simple automation demo. A LangGraph orchestrator coordinates specialist agents for term extraction, compliance review, and credit risk scoring. The system then surfaces contradictions, generates counterfactual explanations, supports reviewer policy modes, logs human overrides, exports a PDF review packet, and evaluates performance against a structured 50-case SBA-style Week 4 gold set.
 
-Default mode is deterministic so evaluation is reproducible. Live LangChain-backed LLM mode is the differentiator for the Agentic AI demo: it routes agents and judge models through an OpenAI-compatible provider such as Nebius, displays live per-case progress for long 30-case runs, and can emit LangSmith traces for observability.
+Default mode is deterministic so evaluation is reproducible. Live LangChain-backed LLM mode is the differentiator for the Agentic AI demo: it routes agents and judge models through an OpenAI-compatible provider such as Nebius, displays live per-case progress for long evaluation runs, and can emit LangSmith traces for observability.
 
 ## Why It Matters
 
@@ -27,16 +27,16 @@ Loan review decisions can affect whether a small business receives capital, surv
 - Human override audit log per finding
 - PDF export of the review packet
 - LangSmith-compatible optional tracing
-- 30-case gold-set evaluation with clean, ambiguous, and adversarial tiers
+- 50-case Week 4 evaluation with clean, ambiguous, adversarial, edge-case, and known-failure tiers
 - Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, live LLM drift probing, deterministic drift benchmarking, and confidence calibration
-- Per-case progress indicators for full live 30-case evaluation and judge runs
+- Per-case progress indicators for full live evaluation and judge runs
 - FastAPI SSE streaming endpoints for live agent and evaluation events
 - API rate limiting on live/repeated model endpoints to protect hosted demo credits
 - GitHub Actions CI for lint, compile, and tests
 
 ## Results Snapshot
 
-Current deterministic evaluation results on the controlled SBA-style gold set:
+Current deterministic product benchmark on the original controlled SBA-style gold set:
 
 | Metric | Result |
 | --- | ---: |
@@ -46,9 +46,9 @@ Current deterministic evaluation results on the controlled SBA-style gold set:
 | Risk band accuracy | 100.00% |
 | Deterministic drift stability | 100.00% across 5 runs per case |
 | Risk confidence expected calibration error | 17.00% |
-| Test suite | 81 passing tests |
+| Test suite | CI-covered pytest suite |
 
-The deterministic benchmark is intentionally controlled: it validates orchestration, scoring contracts, ablations, and UI behavior against a stable 30-case set. The live LLM mode is where non-deterministic agent behavior, primary/secondary judge disagreement, and LangSmith traceability become visible. Confidence calibration remains visible as a separate quality signal even when label accuracy is high.
+The deterministic benchmark is intentionally controlled: it validates orchestration, scoring contracts, ablations, and UI behavior against a stable product-demo set. The Week 4 live evaluation expands this into a 50-case improvement lab where non-deterministic agent behavior, primary/secondary judge disagreement, failure attribution, and LangSmith traceability become visible. Confidence calibration remains visible as a separate quality signal even when label accuracy is high.
 
 ## Week 4 Evaluation Lab
 
@@ -84,7 +84,7 @@ Start here for the complete submission packet: [Week 4 Submission Packet](docs/w
 
 ## Data Scope
 
-The checked-in data is a curated SBA-style seed set, not a full production SBA corpus. It is designed for reproducible evaluation and contains clean, ambiguous, and adversarial cases with hand-authored labels. The project includes a public SBA FOIA loader scaffold in `loan_pipeline/data/load_sba_public.py`; expanding the gold set from downloaded SBA Open Data exports is the strongest v2 improvement.
+The checked-in data is a curated SBA-style seed set, not a full production SBA corpus. It is designed for reproducible evaluation and contains clean, ambiguous, adversarial, edge-case, and known-failure cases with hand-authored labels. The project includes a public SBA FOIA loader scaffold in `loan_pipeline/data/load_sba_public.py`; expanding the gold set from downloaded SBA Open Data exports is the strongest v2 improvement.
 
 ## Architecture Diagram
 
@@ -120,7 +120,7 @@ The pipeline uses a hybrid LangGraph DAG:
 7. Counterfactual explainer generates actionable "what would change the outcome" guidance.
 8. Human reviewer can override individual findings with an audit rationale.
 9. PDF packet exporter creates a portable review artifact for the human decision record.
-10. Evaluation Harness scores the system against a 30-case gold set.
+10. Evaluation Harness scores the system against both the product-demo benchmark and the Week 4 50-case gold set.
 
 The current orchestrator is backed by a compiled LangGraph `StateGraph`.
 
@@ -128,11 +128,19 @@ The current orchestrator is backed by a compiled LangGraph `StateGraph`.
 
 The evaluation harness is a first-class subsystem.
 
-Gold set:
+Product-demo gold set:
 
 - 10 clean loan cases
 - 10 ambiguous loan cases
 - 10 adversarial loan cases
+
+Week 4 evaluation set:
+
+- 10 clean cases
+- 10 ambiguous cases
+- 15 adversarial cases
+- 10 edge cases
+- 5 known-failure cases
 
 Evaluation includes:
 
@@ -150,7 +158,7 @@ Evaluation includes:
 - Ablation visualization that shows each agent's measured contribution
 - Confidence calibration comparing risk confidence to observed accuracy
 - Live LLM drift probe for selected-case nondeterminism
-- Deterministic drift benchmark for repeated 30-case reproducibility
+- Deterministic drift benchmark for repeated benchmark reproducibility
 - LangGraph execution trace showing the parallel specialist review stage
 - Reviewer policy mode: SBA reviewer, bank underwriter, and CDFI lender
 
@@ -158,35 +166,65 @@ Evaluation includes:
 
 ```text
 loan_pipeline/
+  api/
+    app.py
+    streaming.py
+    rate_limit.py
   agents/
     term_extractor.py
     compliance_checker.py
     credit_risk_scorer.py
+  data/
+    sba_loans.csv
+    week4_sba_loans.csv
+    load_sba_public.py
   graph/
     state.py
     orchestrator.py
     edges.py
   eval/
     gold_set.json
+    week4_gold_set.json
+    week4_dataset.py
+    week4_evaluators.py
+    week4_report.py
+    week4_compare.py
     judge.py
     ablation.py
+    drift.py
+    calibration.py
+    failure_attribution.py
+  llm/
+    client.py
+    prompts.py
   review/
     contradictions.py
     counterfactuals.py
+    audit.py
+    pdf_export.py
+    policies.py
   ui/
     app.py
-  data/
-    sba_loans.csv
-    load_sba_public.py
   config.py
 docs/
   architecture.md
   data_source.md
   demo_script.md
   evaluation_plan.md
-  cv_bullets.md
+  week4_submission_packet.md
+  week4_submission.md
+  week4_baseline_report.md
+  week4_improvement_report.md
 sample_documents/
   Northstar_Custom_Cabinets_Loan_Profile.pdf
+scripts/
+  week4_export_dataset.py
+  week4_upload_dataset.py
+  week4_run_baseline.py
+  week4_compare_runs.py
+web/
+  app/
+  package.json
 requirements.txt
 README.md
 tests/
@@ -397,7 +435,7 @@ Run tests:
 pytest
 ```
 
-Run the 30-case evaluation:
+Run the original product-demo evaluation:
 
 ```powershell
 python -m loan_pipeline.eval.run_eval
@@ -423,11 +461,20 @@ Generate the Markdown evaluation report:
 python -m loan_pipeline.eval.report
 ```
 
+Run the Week 4 50-case evaluation workflow:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\week4_export_dataset.py
+.\.venv\Scripts\python.exe scripts\week4_upload_dataset.py
+.\.venv\Scripts\python.exe scripts\week4_run_baseline.py --live --log-langsmith
+.\.venv\Scripts\python.exe scripts\week4_compare_runs.py
+```
+
 ## Limitations And Next Steps
 
 - Default mode uses deterministic agent internals for reproducible evaluation; optional LLM mode is available through `USE_LLM_AGENTS=true`.
 - Reviewer policy modes are configurable institutional postures, not official legal determinations.
-- The included 30-case gold set is SBA-style seed data; the public SBA FOIA loader is scaffolded for larger hand-adjudicated datasets.
+- The included gold sets are SBA-style seed data; the public SBA FOIA loader is scaffolded for larger hand-adjudicated datasets.
 - Next production steps would be FastAPI service packaging, durable checkpointing for long-running human review, and richer document parsing for scanned loan packets.
 
 Normalize a downloaded SBA FOIA CSV in code:
