@@ -213,7 +213,7 @@ def _invoke_json_prompt(
         response = llm.invoke(prompt)
     except Exception as exc:
         raise LLMResponseError(
-            "LLM call failed.",
+            f"LLM call failed: {exc}",
             agent_name=agent_name,
             case_id=case_id,
             operation=operation,

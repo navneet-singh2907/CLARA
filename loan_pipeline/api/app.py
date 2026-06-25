@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from loan_pipeline.api.rate_limit import enforce_rate_limit
 from loan_pipeline.api.streaming import (
+    error_payload,
     stream_evaluation_events,
     stream_judge_agreement_events,
     stream_live_drift_events,
@@ -228,7 +229,18 @@ async def review_document(
         raise HTTPException(status_code=400, detail="Uploaded document did not contain extractable text.")
 
     loan_case = _parse_uploaded_loan_case(document_text)
-    packet = run_pipeline(loan_case, review_policy=policy)
+    try:
+        packet = run_pipeline(loan_case, review_policy=policy)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=error_payload(
+                exc,
+                endpoint="/review/document",
+                file_name=file.filename,
+                case_id=loan_case.case_id,
+            ),
+        ) from exc
     return {
         "file_name": file.filename,
         "characters_extracted": len(document_text),
@@ -308,10 +320,20 @@ async def judge_agreement_packet(request: Request, file: UploadFile = DOCUMENT_F
     packet_text = await _extract_upload_text(file)
     if not packet_text.strip():
         raise HTTPException(status_code=400, detail="Uploaded packet did not contain extractable text.")
-    return run_packet_inter_rater_report(
-        packet_text=packet_text,
-        artifact_name=file.filename or "uploaded_packet.pdf",
-    )
+    try:
+        return run_packet_inter_rater_report(
+            packet_text=packet_text,
+            artifact_name=file.filename or "uploaded_packet.pdf",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=error_payload(
+                exc,
+                endpoint="/judge-agreement/packet",
+                file_name=file.filename,
+            ),
+        ) from exc
 
 
 @app.get("/report")

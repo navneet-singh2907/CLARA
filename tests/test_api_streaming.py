@@ -252,6 +252,67 @@ def test_api_packet_judge_agreement_endpoint() -> None:
     assert "dimension_deltas" in payload
 
 
+def test_api_review_document_returns_structured_error_for_llm_failure(monkeypatch) -> None:
+    def failing_pipeline(*args, **kwargs):
+        raise LLMResponseError(
+            "LLM call failed: Connection error.",
+            agent_name="term_extractor",
+            case_id="DOC-123",
+            operation="extract_terms",
+            provider="nebius",
+            model="Qwen/Qwen3-235B-A22B-Instruct-2507",
+            temperature=0.2,
+        )
+
+    monkeypatch.setattr(api_app, "run_pipeline", failing_pipeline)
+    client = TestClient(app)
+    document_text = "\n".join(
+        [
+            "Borrower: Northstar Custom Cabinets LLC",
+            "Industry: custom cabinetry",
+            "NAICS: 337110",
+            "Loan amount: $425,000",
+            "SBA guaranteed amount: $318,750",
+            "Term: 84",
+            "Jobs supported: 14",
+            "Credit score: 701",
+        ]
+    )
+
+    response = client.post(
+        "/review/document",
+        data={"policy": "sba_reviewer"},
+        files={"file": ("loan.txt", document_text.encode("utf-8"), "text/plain")},
+    )
+
+    assert response.status_code == 502
+    detail = response.json()["detail"]
+    assert detail["endpoint"] == "/review/document"
+    assert detail["error_type"] == "LLMResponseError"
+    assert detail["agent_name"] == "term_extractor"
+    assert detail["operation"] == "extract_terms"
+    assert "Connection error" in detail["message"]
+
+
+def test_api_packet_judge_returns_structured_error_for_model_failure(monkeypatch) -> None:
+    def failing_packet_report(*args, **kwargs):
+        raise RuntimeError("judge provider unavailable")
+
+    monkeypatch.setattr(api_app, "run_packet_inter_rater_report", failing_packet_report)
+    client = TestClient(app)
+
+    response = client.post(
+        "/judge-agreement/packet",
+        files={"file": ("packet.txt", b"CLARA packet text", "text/plain")},
+    )
+
+    assert response.status_code == 502
+    detail = response.json()["detail"]
+    assert detail["endpoint"] == "/judge-agreement/packet"
+    assert detail["error_type"] == "RuntimeError"
+    assert "judge provider unavailable" in detail["message"]
+
+
 def test_api_report_endpoint() -> None:
     client = TestClient(app)
 
