@@ -7,12 +7,14 @@ from fastapi.testclient import TestClient
 from loan_pipeline.api.app import app
 from loan_pipeline.api.rate_limit import reset_rate_limits
 from loan_pipeline.api.streaming import (
+    error_payload,
     sse_event,
     stream_judge_agreement_events,
     stream_live_drift_events,
     stream_review_events,
 )
 from loan_pipeline.config import reset_settings_cache
+from loan_pipeline.llm.client import LLMResponseError
 
 
 def test_sse_event_formats_named_json_event() -> None:
@@ -21,6 +23,31 @@ def test_sse_event_formats_named_json_event() -> None:
     assert raw.startswith("event: progress\n")
     assert 'data: {"completed": 1, "total": 30}' in raw
     assert raw.endswith("\n\n")
+
+
+def test_error_payload_preserves_llm_context() -> None:
+    payload = error_payload(
+        LLMResponseError(
+            "Response is not valid JSON.",
+            agent_name="credit_risk_scorer",
+            case_id="ADV2-003",
+            operation="add_risk_rationale",
+            provider="nebius",
+            model="Qwen/Qwen3-235B-A22B-Instruct-2507",
+            temperature=0.2,
+            response_preview="not json",
+        ),
+        run_type="live_drift",
+    )
+
+    assert payload["error_type"] == "LLMResponseError"
+    assert payload["run_type"] == "live_drift"
+    assert payload["agent_name"] == "credit_risk_scorer"
+    assert payload["case_id"] == "ADV2-003"
+    assert payload["operation"] == "add_risk_rationale"
+    assert payload["provider"] == "nebius"
+    assert payload["model"] == "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    assert payload["response_preview"] == "not json"
 
 
 def test_review_stream_emits_run_completed() -> None:

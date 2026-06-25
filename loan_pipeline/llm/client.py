@@ -14,12 +14,62 @@ from loan_pipeline.llm.prompts import (
     TERM_EXTRACTION_PROMPT,
 )
 
+LLM_TIMEOUT_SECONDS = 30.0
+LLM_RESPONSE_PREVIEW_CHARS = 500
+
+
+class LLMResponseError(Exception):
+    """Raised when an LLM returns a response that cannot be parsed or used.
+
+    Carries structured context so callers and log aggregators can pinpoint
+    exactly which agent, case, and provider produced the bad response.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        agent_name: str,
+        case_id: str | None = None,
+        operation: str,
+        provider: str,
+        model: str,
+        temperature: float,
+        response_preview: str | None = None,
+    ) -> None:
+        self.agent_name = agent_name
+        self.case_id = case_id
+        self.operation = operation
+        self.provider = provider
+        self.model = model
+        self.temperature = temperature
+        self.response_preview = response_preview
+        super().__init__(
+            f"[{agent_name}|{operation}|case={case_id}|{provider}/{model}] {message}"
+            + (f" | response_preview={response_preview!r}" if response_preview else "")
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "agent_name": self.agent_name,
+            "case_id": self.case_id,
+            "operation": self.operation,
+            "provider": self.provider,
+            "model": self.model,
+            "temperature": self.temperature,
+            "response_preview": self.response_preview,
+            "message": str(self),
+        }
+
 
 def extract_terms_with_llm(loan_case: LoanCase) -> ExtractedTerms:
     settings = _require_llm_settings()
     payload = _invoke_json_prompt(
         settings=settings,
         prompt=TERM_EXTRACTION_PROMPT.format(loan_case_json=json.dumps(asdict(loan_case), indent=2)),
+        agent_name="term_extractor",
+        case_id=loan_case.case_id,
+        operation="extract_terms",
     )
     return ExtractedTerms(
         case_id=str(payload["case_id"]),
@@ -54,6 +104,9 @@ def add_llm_compliance_note(terms: ExtractedTerms, compliance: ComplianceResult)
             terms_json=json.dumps(asdict(terms), indent=2),
             compliance_json=json.dumps(asdict(compliance), indent=2),
         ),
+        agent_name="compliance_checker",
+        case_id=terms.case_id,
+        operation="add_compliance_note",
     )
     reviewer_note = str(payload.get("reviewer_note", "")).strip()
     if not reviewer_note:
@@ -73,6 +126,9 @@ def add_llm_risk_rationale(terms: ExtractedTerms, risk: RiskResult) -> RiskResul
             terms_json=json.dumps(asdict(terms), indent=2),
             risk_json=json.dumps(asdict(risk), indent=2),
         ),
+        agent_name="credit_risk_scorer",
+        case_id=terms.case_id,
+        operation="add_risk_rationale",
     )
     rationale = str(payload.get("rationale", "")).strip()
     if not rationale:
@@ -85,6 +141,9 @@ def parse_document_to_loan_case(document_text: str) -> LoanCase:
     payload = _invoke_json_prompt(
         settings=settings,
         prompt=DOCUMENT_PARSE_PROMPT.format(document_text=document_text.strip()),
+        agent_name="document_parser",
+        case_id=None,
+        operation="parse_document",
     )
     case_id = "DOC-" + hashlib.sha256(document_text.encode()).hexdigest()[:8].upper()
     credit_score = payload.get("borrower_credit_score")
@@ -115,23 +174,69 @@ def _require_llm_settings() -> Settings:
     return settings
 
 
-def _invoke_json_prompt(settings: Settings, prompt: str) -> dict[str, Any]:
+def _invoke_json_prompt(
+    settings: Settings,
+    prompt: str,
+    *,
+    agent_name: str,
+    case_id: str | None = None,
+    operation: str,
+) -> dict[str, Any]:
     from langchain_openai import ChatOpenAI
+
+    provider = settings.llm_provider
+    model = settings.openai_model
+    temperature = settings.llm_temperature
 
     llm = ChatOpenAI(
         api_key=settings.llm_api_key,
         base_url=settings.llm_base_url,
-        model=settings.openai_model,
-        temperature=settings.llm_temperature,
+        model=model,
+        temperature=temperature,
+        timeout=LLM_TIMEOUT_SECONDS,
     )
-    response = llm.invoke(prompt)
+
+    ctx = dict(
+        agent_name=agent_name,
+        case_id=case_id,
+        operation=operation,
+        provider=provider,
+        model=model,
+        temperature=temperature,
+    )
+
+    try:
+        response = llm.invoke(prompt)
+    except Exception as exc:
+        raise LLMResponseError("LLM call failed.", **ctx) from exc
+
     content = response.content if hasattr(response, "content") else str(response)
     if not isinstance(content, str):
         content = str(content)
-    return _parse_json_content(content)
+
+    return _parse_json_content(content, **ctx)
 
 
-def _parse_json_content(content: str) -> dict[str, Any]:
+def _parse_json_content(
+    content: str,
+    *,
+    agent_name: str,
+    case_id: str | None,
+    operation: str,
+    provider: str,
+    model: str,
+    temperature: float,
+) -> dict[str, Any]:
+    ctx = dict(
+        agent_name=agent_name,
+        case_id=case_id,
+        operation=operation,
+        provider=provider,
+        model=model,
+        temperature=temperature,
+    )
+    preview = content[:LLM_RESPONSE_PREVIEW_CHARS].replace("\n", " ")
+
     stripped = content.strip()
     if stripped.startswith("```"):
         stripped = stripped.strip("`")
@@ -140,9 +245,15 @@ def _parse_json_content(content: str) -> dict[str, Any]:
     try:
         payload = json.loads(stripped)
     except json.JSONDecodeError as exc:
-        raise ValueError("LLM response must be valid JSON.") from exc
+        raise LLMResponseError(
+            "Response is not valid JSON.", response_preview=preview, **ctx
+        ) from exc
     if not isinstance(payload, dict):
-        raise ValueError("LLM response JSON must be an object.")
+        raise LLMResponseError(
+            f"Response JSON must be an object, got {type(payload).__name__}.",
+            response_preview=preview,
+            **ctx,
+        )
     return payload
 
 

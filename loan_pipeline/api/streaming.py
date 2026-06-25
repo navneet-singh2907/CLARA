@@ -11,10 +11,21 @@ from loan_pipeline.eval.inter_rater import run_inter_rater_report
 from loan_pipeline.eval.run_eval import load_gold_labels, run_eval
 from loan_pipeline.graph.orchestrator import build_review_graph, run_pipeline
 from loan_pipeline.graph.state import ReviewPolicy, initial_state
+from loan_pipeline.llm.client import LLMResponseError
 
 
 def sse_event(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+def error_payload(exc: Exception, **context: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {"message": str(exc), **context}
+    if isinstance(exc, LLMResponseError):
+        payload.update(exc.to_dict())
+        payload["error_type"] = "LLMResponseError"
+    else:
+        payload["error_type"] = type(exc).__name__
+    return payload
 
 
 def stream_review_events(
@@ -59,7 +70,7 @@ def stream_review_events(
 
                 yield sse_event("graph_update", {"node": node, "keys": sorted(update.keys())})
     except Exception as exc:
-        yield sse_event("error", {"case_id": loan_case.case_id, "message": str(exc)})
+        yield sse_event("error", error_payload(exc, case_id=loan_case.case_id))
         return
 
     if review_packet is None:
@@ -113,7 +124,7 @@ def stream_evaluation_events() -> Iterable[str]:
                 )
             )
         except Exception as exc:
-            event_queue.put(sse_event("error", {"run_type": "evaluation", "message": str(exc)}))
+            event_queue.put(sse_event("error", error_payload(exc, run_type="evaluation")))
         finally:
             event_queue.put(None)
 
@@ -206,9 +217,7 @@ def stream_judge_agreement_events() -> Iterable[str]:
                 )
             )
         except Exception as exc:
-            event_queue.put(
-                sse_event("error", {"run_type": "judge_agreement", "message": str(exc)})
-            )
+            event_queue.put(sse_event("error", error_payload(exc, run_type="judge_agreement")))
         finally:
             event_queue.put(None)
 
@@ -284,12 +293,12 @@ def stream_live_drift_events(
         except Exception as exc:
             yield sse_event(
                 "error",
-                {
-                    "run_type": "live_drift",
-                    "case_id": loan_case.case_id,
-                    "run_number": run_number,
-                    "message": str(exc),
-                },
+                error_payload(
+                    exc,
+                    run_type="live_drift",
+                    case_id=loan_case.case_id,
+                    run_number=run_number,
+                ),
             )
             return
 
