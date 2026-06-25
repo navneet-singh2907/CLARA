@@ -5,6 +5,8 @@ import json
 from dataclasses import asdict, replace
 from typing import Any
 
+from pydantic import SecretStr
+
 from loan_pipeline.config import Settings, get_settings
 from loan_pipeline.graph.state import ComplianceResult, ExtractedTerms, LoanCase, RiskResult
 from loan_pipeline.llm.prompts import (
@@ -66,7 +68,9 @@ def extract_terms_with_llm(loan_case: LoanCase) -> ExtractedTerms:
     settings = _require_llm_settings()
     payload = _invoke_json_prompt(
         settings=settings,
-        prompt=TERM_EXTRACTION_PROMPT.format(loan_case_json=json.dumps(asdict(loan_case), indent=2)),
+        prompt=TERM_EXTRACTION_PROMPT.format(
+            loan_case_json=json.dumps(asdict(loan_case), indent=2)
+        ),
         agent_name="term_extractor",
         case_id=loan_case.case_id,
         operation="extract_terms",
@@ -87,7 +91,9 @@ def extract_terms_with_llm(loan_case: LoanCase) -> ExtractedTerms:
             else None
         ),
         years_in_business=(
-            float(payload["years_in_business"]) if payload.get("years_in_business") is not None else None
+            float(payload["years_in_business"])
+            if payload.get("years_in_business") is not None
+            else None
         ),
         prior_default=bool(payload["prior_default"]),
         missing_documents=list(payload.get("missing_documents") or []),
@@ -170,7 +176,9 @@ def parse_document_to_loan_case(document_text: str) -> LoanCase:
 def _require_llm_settings() -> Settings:
     settings = get_settings()
     if not settings.llm_api_key:
-        raise RuntimeError("USE_LLM_AGENTS=true requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY.")
+        raise RuntimeError(
+            "USE_LLM_AGENTS=true requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY."
+        )
     return settings
 
 
@@ -187,16 +195,39 @@ def _invoke_json_prompt(
     provider = settings.llm_provider
     model = settings.openai_model
     temperature = settings.llm_temperature
+    api_key = settings.llm_api_key
+    if api_key is None:
+        raise RuntimeError(
+            "USE_LLM_AGENTS=true requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY."
+        )
 
     llm = ChatOpenAI(
-        api_key=settings.llm_api_key,
+        api_key=SecretStr(api_key),
         base_url=settings.llm_base_url,
         model=model,
         temperature=temperature,
         timeout=LLM_TIMEOUT_SECONDS,
     )
 
-    ctx = dict(
+    try:
+        response = llm.invoke(prompt)
+    except Exception as exc:
+        raise LLMResponseError(
+            "LLM call failed.",
+            agent_name=agent_name,
+            case_id=case_id,
+            operation=operation,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+        ) from exc
+
+    content = response.content if hasattr(response, "content") else str(response)
+    if not isinstance(content, str):
+        content = str(content)
+
+    return _parse_json_content(
+        content,
         agent_name=agent_name,
         case_id=case_id,
         operation=operation,
@@ -204,17 +235,6 @@ def _invoke_json_prompt(
         model=model,
         temperature=temperature,
     )
-
-    try:
-        response = llm.invoke(prompt)
-    except Exception as exc:
-        raise LLMResponseError("LLM call failed.", **ctx) from exc
-
-    content = response.content if hasattr(response, "content") else str(response)
-    if not isinstance(content, str):
-        content = str(content)
-
-    return _parse_json_content(content, **ctx)
 
 
 def _parse_json_content(
@@ -227,14 +247,6 @@ def _parse_json_content(
     model: str,
     temperature: float,
 ) -> dict[str, Any]:
-    ctx = dict(
-        agent_name=agent_name,
-        case_id=case_id,
-        operation=operation,
-        provider=provider,
-        model=model,
-        temperature=temperature,
-    )
     preview = content[:LLM_RESPONSE_PREVIEW_CHARS].replace("\n", " ")
 
     stripped = content.strip()
@@ -246,13 +258,25 @@ def _parse_json_content(
         payload = json.loads(stripped)
     except json.JSONDecodeError as exc:
         raise LLMResponseError(
-            "Response is not valid JSON.", response_preview=preview, **ctx
+            "Response is not valid JSON.",
+            agent_name=agent_name,
+            case_id=case_id,
+            operation=operation,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            response_preview=preview,
         ) from exc
     if not isinstance(payload, dict):
         raise LLMResponseError(
             f"Response JSON must be an object, got {type(payload).__name__}.",
+            agent_name=agent_name,
+            case_id=case_id,
+            operation=operation,
+            provider=provider,
+            model=model,
+            temperature=temperature,
             response_preview=preview,
-            **ctx,
         )
     return payload
 
