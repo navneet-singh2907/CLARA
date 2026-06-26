@@ -31,6 +31,7 @@ Loan review decisions can affect whether a small business receives capital, surv
 - Ablation visualization, LLM-as-judge scaffold, inter-rater agreement, live LLM drift probing, deterministic drift benchmarking, and confidence calibration
 - Per-case progress indicators for full live evaluation and judge runs
 - FastAPI SSE streaming endpoints for live agent and evaluation events
+- MCP evidence server for external agent/tool inspection of cases, policies, gold labels, and traces
 - API rate limiting on live/repeated model endpoints to protect hosted demo credits
 - GitHub Actions CI for lint, compile, and tests
 
@@ -91,6 +92,27 @@ CLARA includes production-style controls for live agent demos:
 - Uploaded PDF/text loan documents are size-limited and validated before review.
 - Missing required loan fields return clear `400` responses instead of silently creating weak default cases.
 - If a critical specialist agent fails, CLARA produces a conservative fallback review packet and escalates to human review instead of collapsing the graph.
+
+## MCP Evidence Server
+
+CLARA includes a read-only MCP server so an external agent or MCP client can inspect the same evidence the app uses. This makes Week 4 evaluation more than a UI demo: another tool can ask CLARA for the source case, reviewer policy profile, expected gold label, deterministic pipeline comparison, and execution trace.
+
+Run the MCP server locally:
+
+```powershell
+python -m loan_pipeline.mcp.evidence_server
+```
+
+Exposed MCP tools:
+
+- `list_loan_cases` - list product-demo or Week 4 cases, optionally filtered by tier
+- `lookup_loan_case` - return the structured source data for one loan case
+- `get_policy_profile` - inspect SBA, bank, or CDFI reviewer thresholds
+- `get_gold_label` - return the expected gold-set outcome for a case
+- `compare_case_to_gold` - run CLARA deterministically and compare output to the gold label
+- `inspect_pipeline_trace` - return agent trace entries, validation errors, agent errors, and review packet
+
+This server is intentionally read-only. It does not mutate audit logs, spend live LLM credits, or write files. Its purpose is evidence retrieval, failure inspection, and reproducible evaluation support.
 
 ## Data Scope
 

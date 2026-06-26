@@ -77,14 +77,21 @@ CLARA Week 4 Eval Lab
 
 ## MCP Usage Plan
 
-MCP is part of the evaluation operations layer, not a side note.
+MCP is part of the evaluation operations layer, not a side note. CLARA now exposes a read-only MCP evidence server at `loan_pipeline.mcp.evidence_server`, so MCP-capable tools can inspect the source case, reviewer policy, gold label, deterministic prediction, and agent execution trace.
 
 | MCP/tooling layer | Used for | Evidence produced |
 | --- | --- | --- |
+| CLARA MCP evidence server | Inspect cases, policies, gold labels, pipeline predictions, and agent traces. | MCP tool outputs for `lookup_loan_case`, `compare_case_to_gold`, and `inspect_pipeline_trace`. |
 | Browser MCP | Verify deployed CLARA UI, progress bars, SSE traces, and packet download flow. | Screenshots for report and Loom. |
 | PDF/Docs MCP | Generate the final board-style evaluation report. | `docs/week4_eval_report.pdf` |
 | Filesystem/code tools | Create reproducible dataset/evaluator scripts. | Repo files and CI output. |
 | LangSmith SDK/UI | Store dataset, run baseline/post-improvement evals, compare runs. | LangSmith project and run links. |
+
+Local MCP command:
+
+```powershell
+python -m loan_pipeline.mcp.evidence_server
+```
 
 ## Baseline Run
 
