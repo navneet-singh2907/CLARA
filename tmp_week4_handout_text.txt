@@ -1,0 +1,418 @@
+pages 107
+
+--- PAGE 1 ---
+Agentic AI Bootcamp
+Week 4
+AI Evals, Observability
+& Monitoring
+Session 1
+Presented By
+Arvind Narayan and Aishwarya Srinivasan
+(The Gen Academy)
+
+--- PAGE 2 ---
+Agenda
+What we will cover today.. What we will cover tomorrow
+● RAG Evals
+● What are benchmarks?
+● Cost and latency as an eval dimension
+● What are AI evals
+● The observability stack: LangSmith, Arize
+● Types of Evals
+● Building eval datasets from real traffic
+● Model vs System Evals
+● Alerts, regression testing, & the CI/CD for AI
+● Building an Eval System
+● How to evaluate an agent
+● Golden Dataset
+● Eval Metrics
+● AI Builder of the Week
+● Human Evals
+● Weekly Quiz- AI Quiz Wiz
+● LLM-as-a-Judge
+● Week 4 Project
+● Breakout Room Activity
+
+--- PAGE 3 ---
+What are benchmarks?
+
+--- PAGE 4 ---
+Benchmarks you would have seen
+
+--- PAGE 5 ---
+Public Benchmarks
+
+--- PAGE 6 ---
+When to Trust Benchmarks
+
+--- PAGE 7 ---
+When Benchmarks Mislead
+
+--- PAGE 8 ---
+What are AI evals
+
+--- PAGE 9 ---
+ML evals vs AI evals
+
+--- PAGE 10 ---
+Why AI Evals Are Harder
+
+--- PAGE 11 ---
+Custom Evals:
+Tests Built Around Your System, Not a Leaderboard
+
+--- PAGE 12 ---
+Measuring What Actually Matters in Production
+
+--- PAGE 13 ---
+What Evals Are Not!
+X
+
+--- PAGE 14 ---
+Types of evals
+
+--- PAGE 15 ---
+
+
+
+--- PAGE 16 ---
+Evaluating a model
+versus system
+
+--- PAGE 17 ---
+Model Evals vs. System Evals
+
+--- PAGE 18 ---
+Common Misconceptions
+
+--- PAGE 19 ---
+Making evals a
+“system”
+
+--- PAGE 20 ---
+Vibe Evals
+(Please don’t do this)
+
+--- PAGE 21 ---
+Step 1: Translating Requirements into Evals
+We will see an example
+
+--- PAGE 22 ---
+Step 1: Translating Requirements into Evals
+
+--- PAGE 23 ---
+Step 2: Systematic Evals
+
+--- PAGE 24 ---
+Eval Maturity: From Ad Hoc Testing to Repeatable Pipelines
+Every team starts by eyeballing outputs. The ones that ship reliably are the ones that systematized
+that instinct. The gap between them is not talent. It is process.
+
+--- PAGE 25 ---
+Why exactly are we “engineering” evals
+
+--- PAGE 26 ---
+Whack-a-Mole in Agentic AI System
+
+--- PAGE 27 ---
+Prompt-First vs Eval-Driver development
+
+--- PAGE 28 ---
+Deep-Dive: Eval-Driven Development Workflow
+
+--- PAGE 29 ---
+How evals change when you are using an LLM vs Agent
+
+--- PAGE 30 ---
+You need data to tell
+the model what’s good
+i.e Golden Dataset
+Over to Arvind
+
+--- PAGE 31 ---
+Golden Dataset (aka ground truth)
+
+--- PAGE 32 ---
+Example of Golden Datasets
+https://huggingface.co/datasets/openai/gsm8k https://huggingface.co/datasets/aps/super_glue
+These are benchmark datasets
+
+--- PAGE 33 ---
+What is good reference data?
+
+--- PAGE 34 ---
+Things your golden dataset should cover
+
+--- PAGE 35 ---
+Golden Answers vs. Grading Rubrics
+
+--- PAGE 36 ---
+Where to find the golden data set
+
+--- PAGE 37 ---
+Building the Eval Dataset: The Six Columns That Matter
+
+--- PAGE 38 ---
+What good and what’s not!
+
+--- PAGE 39 ---
+You NEVER Build Evals just once
+
+--- PAGE 40 ---
+Metrics
+
+--- PAGE 41 ---
+👀
+
+--- PAGE 42 ---
+Types of metrics
+
+--- PAGE 43 ---
+Human Evals
+
+--- PAGE 44 ---
+Where should human evaluations be used
+
+--- PAGE 45 ---
+LLM as a Judge
+
+--- PAGE 46 ---
+Where can we use LLM-as-a-judge
+
+--- PAGE 47 ---
+Prompt your LLM judge well
+
+--- PAGE 48 ---
+LLM-judges need calibration
+
+--- PAGE 49 ---
+When Not to Trust an LLM-Judge
+
+--- PAGE 50 ---
+Hybrid Evaluation:
+How Humans and Judges Actually Work Together
+
+--- PAGE 51 ---
+Evaluation Lifecycle
+
+--- PAGE 52 ---
+Don’t touch an eval
+platform till you have
+done this manually on a
+Excel Sheet
+
+--- PAGE 53 ---
+Demo time
+Let’s pray to the demo gods
+
+--- PAGE 54 ---
+Demo:
+Evals for
+Eikos Health
+
+--- PAGE 55 ---
+Demo: Evals for Eikos Health
+
+--- PAGE 56 ---
+Online vs Offline Evals
+
+--- PAGE 57 ---
+What we will cover tomorrow
+● RAG Evals
+● Cost and latency as an eval dimension
+● The observability stack: LangSmith, Arize
+● Building eval datasets from real traffic
+● Alerts, regression testing, and the CI/CD for AI (eval/monitoring standpoint)
+● How to evaluate an agent
+● AI Builder of the Week
+● Weekly Quiz- AI Quiz Wiz
+● Week 4 Project
+● Breakout Room Activity
+
+--- PAGE 58 ---
+Breakout room activity
+● Groups of 6-7 people
+● 15 minutes
+● Select use-case
+● Brainstorm end-to-end pipeline
+● Work on building a prototype (optional)
+● Pitch during Demo Day - July 11th, 12th
+
+--- PAGE 59 ---
+The Eval Lifecycle
+Source - https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+
+--- PAGE 60 ---
+Week 3- AI Evals
+Session -2
+
+--- PAGE 61 ---
+Week 4 Check-in
+How are you feeling so far?
+
+--- PAGE 62 ---
+Agenda
+● Quick recap from yesterday
+● Cost and latency as an eval dimension
+● The observability stack
+● Building eval datasets from real traffic
+● Alerts, regression testing, and the CI/CD for AI (eval/monitoring standpoint)
+● RAG Evals
+● How to evaluate an agent
+● AI Builder of the Week
+● Weekly Quiz- AI Quiz Wiz
+● Week 4 Project
+● Breakout Room Activity
+
+--- PAGE 63 ---
+Measuring
+beyond the
+“answers”
+
+--- PAGE 64 ---
+Cost and Latency
+https://artificialanalysis.ai/?cost=intelligence-vs-cost-per-task&total-cost=intelligence-vs-total-cost&price=intelligence-vs-price&speed=intelligence-vs-speed#price-and-cost
+
+--- PAGE 65 ---
+
+
+--- PAGE 66 ---
+
+
+--- PAGE 67 ---
+
+
+--- PAGE 68 ---
+
+
+--- PAGE 69 ---
+3 Dimensions of Agent Evaluation
+
+--- PAGE 70 ---
+Evals vs
+Monitoring vs
+Observability
+
+--- PAGE 71 ---
+Evals vs Monitoring vs Observability
+
+--- PAGE 72 ---
+Monitoring: Watching Production Health in Real-time
+
+--- PAGE 73 ---
+Observability: Seeing Inside the Black Box
+An LLM system is non-deterministic and multi-step. Observability is the practice of seeing everything that
+happens between a request coming in and a response going out.
+
+--- PAGE 74 ---
+Logging &
+Traces
+
+--- PAGE 75 ---
+Logging & Traces
+(What) (How)
+
+--- PAGE 76 ---
+Why Agentic Systems need “Tracing”
+
+--- PAGE 77 ---
+Tracing the Full Run, Step by Step
+
+--- PAGE 78 ---
+Eval Platforms
+
+--- PAGE 79 ---
+Eval datasets
+for real traffic
+
+--- PAGE 80 ---
+Production System nuances
+
+--- PAGE 81 ---
+Turning Logs into Eval Cases
+
+--- PAGE 82 ---
+Privacy and Governance for Eval Data
+
+--- PAGE 83 ---
+Building a Feedback Loop for Evals
+
+--- PAGE 84 ---
+Alerts, Regression Testing
+and CE/CM
+
+--- PAGE 85 ---
+Alerts for AI Systems
+
+--- PAGE 86 ---
+What Regression Testing Means for AI
+
+--- PAGE 87 ---
+Regression Buckets: The Cases You Protect
+
+--- PAGE 88 ---
+CE/CM for AI Systems
+
+--- PAGE 89 ---
+Why This Matters for Agents
+
+--- PAGE 90 ---
+Quick recap
+for RAG Eval
+Over to Arvind :)
+
+--- PAGE 91 ---
+
+
+--- PAGE 92 ---
+What to Evaluate in RAG: Five Things, Not One
+
+--- PAGE 93 ---
+RAG Metrics: Retrieve + Generate
+
+--- PAGE 94 ---
+The Harness: One Runner, Many Configurations
+
+--- PAGE 95 ---
+Why RAG Evaluation Matters for Agents
+
+--- PAGE 96 ---
+Demo time
+Let’s pray to the demo gods
+
+--- PAGE 97 ---
+- AI Builder of the Week
+- AI Quiz Wiz of the Week
+- Breakout Activity
+- Week 4 Project
+
+--- PAGE 98 ---
+AI Builder of the week
+
+--- PAGE 99 ---
+
+
+--- PAGE 100 ---
+Another chance to be the
+AI Quiz Wiz
+
+--- PAGE 101 ---
+Breakout room activity
+
+--- PAGE 102 ---
+Week 4 Project
+
+--- PAGE 103 ---
+Sampling from Production Logs for better eval set
+
+--- PAGE 104 ---
+Why Logging Isn't Enough: The Middle Is Where Bugs Live
+
+--- PAGE 105 ---
+The Anatomy of a Log
+
+--- PAGE 106 ---
+The Anatomy of a Trace
+
+--- PAGE 107 ---
+Arize: Watching the System After It Ships
