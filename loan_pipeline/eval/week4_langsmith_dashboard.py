@@ -21,6 +21,8 @@ class LangSmithClientProtocol(Protocol):
 
     def create_example(self, **kwargs: Any) -> Any: ...
 
+    def read_project(self, *, project_name: str, include_stats: bool = False) -> Any: ...
+
     def create_project(self, project_name: str, **kwargs: Any) -> Any: ...
 
     def create_run(self, name: str, inputs: dict[str, Any], run_type: str, **kwargs: Any) -> None: ...
@@ -38,20 +40,10 @@ def create_week4_langsmith_dashboard(
     langsmith_client = client or _default_langsmith_client()
     dataset_id = ensure_week4_langsmith_dataset(langsmith_client, dataset_name)
 
-    langsmith_client.create_project(
-        project_name,
-        description=(
-            "CLARA Week 4 dashboard comparing baseline and targeted improved runs "
-            "on the same 50-case loan review evaluation dataset."
-        ),
-        metadata={
-            "product": "CLARA",
-            "week": "4",
-            "evaluation_type": "baseline_vs_improved",
-            "dataset_version": WEEK4_DATASET_VERSION,
-        },
-        upsert=True,
-        reference_dataset_id=dataset_id,
+    ensure_week4_langsmith_project(
+        langsmith_client,
+        project_name=project_name,
+        dataset_id=dataset_id,
     )
 
     baseline = _load_artifact(baseline_path, "baseline")
@@ -115,6 +107,37 @@ def ensure_week4_langsmith_dataset(
             metadata=record["metadata"],
         )
     return dataset_id
+
+
+def ensure_week4_langsmith_project(
+    client: LangSmithClientProtocol,
+    *,
+    project_name: str,
+    dataset_id: str,
+) -> str:
+    """Create or reuse the LangSmith project used for the before/after dashboard."""
+    metadata = {
+        "product": "CLARA",
+        "week": "4",
+        "evaluation_type": "baseline_vs_improved",
+        "dataset_version": WEEK4_DATASET_VERSION,
+    }
+    try:
+        project = client.create_project(
+            project_name,
+            description=(
+                "CLARA Week 4 dashboard comparing baseline and targeted improved runs "
+                "on the same 50-case loan review evaluation dataset."
+            ),
+            metadata=metadata,
+            upsert=True,
+            reference_dataset_id=dataset_id,
+        )
+    except Exception as exc:
+        if "already exists" not in str(exc).lower() and "409" not in str(exc):
+            raise
+        project = client.read_project(project_name=project_name, include_stats=False)
+    return str(project.id)
 
 
 def log_week4_artifact_to_langsmith(

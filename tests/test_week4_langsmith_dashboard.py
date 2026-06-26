@@ -10,11 +10,12 @@ from loan_pipeline.eval.week4_langsmith_dashboard import create_week4_langsmith_
 
 
 class FakeLangSmithClient:
-    def __init__(self) -> None:
+    def __init__(self, *, project_conflict: bool = False) -> None:
         self.datasets = {}
         self.examples = []
         self.projects = []
         self.runs = []
+        self.project_conflict = project_conflict
 
     def read_dataset(self, *, dataset_name: str):
         if dataset_name not in self.datasets:
@@ -30,7 +31,12 @@ class FakeLangSmithClient:
         self.examples.append(kwargs)
         return SimpleNamespace(id=f"example-{len(self.examples)}")
 
+    def read_project(self, *, project_name: str, include_stats: bool = False):
+        return SimpleNamespace(id="existing-project-123", name=project_name)
+
     def create_project(self, project_name: str, **kwargs):
+        if self.project_conflict:
+            raise RuntimeError("409 Client Error: Session already exists.")
         self.projects.append({"project_name": project_name, **kwargs})
         return SimpleNamespace(id="project-123", name=project_name)
 
@@ -77,3 +83,27 @@ def test_week4_langsmith_dashboard_logs_baseline_and_improved_runs(tmp_path) -> 
     assert fake_client.runs[0]["inputs"]["dataset_version"] == WEEK4_DATASET_VERSION
     assert fake_client.runs[0]["tags"] == ["clara", "week4", "eval-dashboard", "baseline"]
     assert fake_client.runs[1]["tags"] == ["clara", "week4", "eval-dashboard", "improved"]
+
+
+def test_week4_langsmith_dashboard_reuses_existing_project_on_conflict(tmp_path) -> None:
+    baseline_path = tmp_path / "baseline.json"
+    improved_path = tmp_path / "improved.json"
+    report_path = tmp_path / "baseline.md"
+
+    baseline = run_week4_baseline_experiment(
+        output_path=baseline_path,
+        report_path=report_path,
+    )
+    improved_path.write_text(json.dumps(baseline), encoding="utf-8")
+
+    fake_client = FakeLangSmithClient(project_conflict=True)
+
+    result = create_week4_langsmith_dashboard(
+        baseline_path=baseline_path,
+        improved_path=improved_path,
+        client=fake_client,
+    )
+
+    assert result["project_name"] == "CLARA Week 4 Baseline vs Improved"
+    assert len(fake_client.projects) == 0
+    assert len(fake_client.runs) == 2
