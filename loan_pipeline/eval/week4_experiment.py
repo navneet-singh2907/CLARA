@@ -18,6 +18,7 @@ from loan_pipeline.config import (
 )
 from loan_pipeline.eval.metrics import summarize_scores
 from loan_pipeline.eval.run_eval import categorize_failure, load_gold_labels
+from loan_pipeline.eval.week4_dataset import WEEK4_DATASET_VERSION
 from loan_pipeline.eval.week4_evaluators import evaluate_case
 
 DEFAULT_EXPERIMENT_DIR = Path("output") / "week4"
@@ -79,6 +80,7 @@ def _run_week4_baseline_experiment(
             "name": "CLARA Week 4 Baseline",
             "created_at": datetime.now(UTC).isoformat(),
             "dataset": "CLARA Week 4 Loan Review Eval",
+            "dataset_version": WEEK4_DATASET_VERSION,
             "case_count": len(results),
             "runtime": "live_llm" if use_live_runtime else "offline_reproducible",
             "description": (
@@ -110,6 +112,7 @@ def _write_partial_results(
         "experiment": {
             "name": "CLARA Week 4 Baseline",
             "runtime": "live_llm" if use_live_runtime else "offline_reproducible",
+            "dataset_version": WEEK4_DATASET_VERSION,
             "completed_cases": len(results),
             "total_cases": total_cases,
             "updated_at": datetime.now(UTC).isoformat(),
@@ -179,6 +182,7 @@ def render_week4_baseline_markdown(artifact: dict[str, Any]) -> str:
         "# CLARA Week 4 Baseline Evaluation",
         "",
         f"Dataset: {artifact['experiment']['dataset']}",
+        f"Dataset version: {artifact['experiment']['dataset_version']}",
         f"Cases: {artifact['experiment']['case_count']}",
         f"Created: {artifact['experiment']['created_at']}",
         "",
@@ -238,7 +242,10 @@ def log_week4_experiment_to_langsmith(
     client = Client()
     client.create_run(
         name=run_name,
-        inputs={"dataset": artifact["experiment"]["dataset"]},
+        inputs={
+            "dataset": artifact["experiment"]["dataset"],
+            "dataset_version": artifact["experiment"]["dataset_version"],
+        },
         outputs=artifact["summary"],
         run_type="chain",
         project_name=project_name,
@@ -246,6 +253,7 @@ def log_week4_experiment_to_langsmith(
         extra={
             "metadata": {
                 "case_count": artifact["experiment"]["case_count"],
+                "dataset_version": artifact["experiment"]["dataset_version"],
                 "created_at": artifact["experiment"]["created_at"],
             }
         },

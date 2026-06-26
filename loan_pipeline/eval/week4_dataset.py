@@ -9,6 +9,7 @@ from loan_pipeline.config import WEEK4_GOLD_SET_JSON, WEEK4_SBA_LOANS_CSV, load_
 from loan_pipeline.eval.run_eval import load_gold_labels
 
 DEFAULT_EXPORT_PATH = Path("output") / "week4" / "clara_week4_langsmith_dataset.jsonl"
+WEEK4_DATASET_VERSION = "clara-week4-v1"
 
 
 def build_week4_dataset_records(
@@ -33,6 +34,7 @@ def build_week4_dataset_records(
                     "expected_outcome": label.expected_outcome,
                 },
                 "metadata": {
+                    "dataset_version": WEEK4_DATASET_VERSION,
                     "tier": label.tier,
                     "scenario_type": _scenario_type(label.tier),
                     "source": "CLARA Week 4 controlled SBA-style evaluation set",
@@ -69,6 +71,12 @@ def upload_week4_dataset_to_langsmith(dataset_name: str = "CLARA Week 4 Loan Rev
             "50-case CLARA evaluation set: 30 Week 3 cases plus 10 edge, "
             "5 known-failure, and 5 adversarial robustness cases."
         ),
+        metadata={
+            "product": "CLARA",
+            "dataset_version": WEEK4_DATASET_VERSION,
+            "case_count": 50,
+            "source": "repo-controlled SBA-style Week 4 gold set",
+        },
     )
     for record in build_week4_dataset_records():
         client.create_example(

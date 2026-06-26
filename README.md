@@ -55,8 +55,13 @@ The deterministic benchmark is intentionally controlled: it validates orchestrat
 
 Week 4 extends CLARA from a 30-case product demo into an evaluation-driven agent improvement lab. The controlled test set now contains 50 SBA-style cases split across clean, ambiguous, adversarial, edge-case, and known-failure scenarios.
 
+Evaluation framing:
+
+> I measure final loan-decision accuracy, compliance red-flag detection, risk-band calibration, agent trajectory correctness, judge agreement, drift stability, and p95 latency on CLARA, a multi-agent small business loan review pipeline, using a frozen 50-case golden dataset covering clean, ambiguous, edge, known-failure, and adversarial loan scenarios. I use exact-match and code-based evaluators for structured labels, LLM-as-judge for faithfulness and explainability, and primary-vs-secondary judge agreement for evaluator reliability. Pass bar: >=90% final outcome accuracy, >=90% compliance accuracy, >=85% risk-band accuracy, 0 critical false approvals, 100% trace coverage for live runs, and p95 latency low enough for demo review. I run this in LangSmith and report the measured delta from baseline to post-improvement.
+
 LangSmith evidence:
 
+- Dataset version: `clara-week4-v1`
 - Dataset: `ec7896af-7117-4f7e-8972-0dc37239036a`
 - Project: `CLARA Week 4 Eval Lab`
 
@@ -500,7 +505,13 @@ Run the Week 4 50-case evaluation workflow:
 .\.venv\Scripts\python.exe scripts\week4_upload_dataset.py
 .\.venv\Scripts\python.exe scripts\week4_run_baseline.py --live --log-langsmith
 .\.venv\Scripts\python.exe scripts\week4_compare_runs.py
+.\.venv\Scripts\python.exe scripts\week4_langsmith_dashboard.py
 ```
+
+The final command creates a LangSmith project named `CLARA Week 4 Baseline vs Improved`
+and logs the baseline and improved artifacts as comparable summary runs against the same
+50-case dataset. This gives reviewers a direct before/after experiment dashboard instead
+of only separate traces.
 
 ## Limitations And Next Steps
 

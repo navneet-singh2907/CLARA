@@ -4,7 +4,11 @@ import json
 
 from loan_pipeline.config import WEEK4_GOLD_SET_JSON, WEEK4_SBA_LOANS_CSV, load_sba_demo_cases
 from loan_pipeline.eval.run_eval import load_gold_labels, run_eval
-from loan_pipeline.eval.week4_dataset import build_week4_dataset_records, export_week4_dataset_jsonl
+from loan_pipeline.eval.week4_dataset import (
+    WEEK4_DATASET_VERSION,
+    build_week4_dataset_records,
+    export_week4_dataset_jsonl,
+)
 from loan_pipeline.eval.week4_evaluators import evaluate_case
 from loan_pipeline.eval.week4_experiment import run_week4_baseline_experiment
 
@@ -32,6 +36,7 @@ def test_week4_langsmith_jsonl_export_shape(tmp_path) -> None:
     assert len(rows) == 50
     assert rows[0]["inputs"]["review_policy"] == "sba_reviewer"
     assert "expected_outcome" in rows[0]["outputs"]
+    assert rows[0]["metadata"]["dataset_version"] == WEEK4_DATASET_VERSION
     assert rows[0]["metadata"]["scenario_type"] == "happy_path"
 
 
@@ -71,6 +76,7 @@ def test_week4_baseline_experiment_writes_local_artifacts(tmp_path) -> None:
     assert output_path.exists()
     assert report_path.exists()
     assert artifact["experiment"]["case_count"] == 50
+    assert artifact["experiment"]["dataset_version"] == WEEK4_DATASET_VERSION
     assert artifact["summary"]["accuracy"]["overall"]["cases"] == 50
     assert "trajectory_correct_rate" in artifact["summary"]
     assert "CLARA Week 4 Baseline Evaluation" in report_path.read_text(encoding="utf-8")
