@@ -398,7 +398,8 @@ def _read_message(input_stream: BinaryIO) -> dict[str, Any] | list[dict[str, Any
 
 def _write_message(response: dict[str, Any] | list[dict[str, Any]], output_stream: BinaryIO) -> None:
     body = json.dumps(response, separators=(",", ":")).encode("utf-8")
-    output_stream.write(body + b"\n")
+    header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+    output_stream.write(header + body)
     output_stream.flush()
 
 
