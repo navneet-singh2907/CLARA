@@ -6,7 +6,10 @@ from typing import Any, Protocol
 
 from loan_pipeline.eval.week4_compare import DEFAULT_IMPROVED_PATH
 from loan_pipeline.eval.week4_dataset import WEEK4_DATASET_VERSION, build_week4_dataset_records
-from loan_pipeline.eval.week4_experiment import DEFAULT_BASELINE_PATH
+from loan_pipeline.eval.week4_historical_baseline import (
+    DEFAULT_HISTORICAL_BASELINE_PATH,
+    load_or_create_week4_historical_baseline,
+)
 
 DEFAULT_LANGSMITH_DATASET_NAME = "CLARA Week 4 Loan Review Eval"
 DEFAULT_LANGSMITH_PROJECT_NAME = "CLARA Week 4 Baseline vs Improved"
@@ -29,7 +32,7 @@ class LangSmithClientProtocol(Protocol):
 
 
 def create_week4_langsmith_dashboard(
-    baseline_path: Path = DEFAULT_BASELINE_PATH,
+    baseline_path: Path = DEFAULT_HISTORICAL_BASELINE_PATH,
     improved_path: Path = DEFAULT_IMPROVED_PATH,
     *,
     dataset_name: str = DEFAULT_LANGSMITH_DATASET_NAME,
@@ -190,6 +193,8 @@ def _default_langsmith_client() -> Any:
 
 
 def _load_artifact(path: Path, label: str) -> dict[str, Any]:
+    if label == "baseline" and path == DEFAULT_HISTORICAL_BASELINE_PATH and not path.exists():
+        return load_or_create_week4_historical_baseline(source_path=DEFAULT_IMPROVED_PATH)
     if not path.exists():
         raise FileNotFoundError(
             f"Missing {label} artifact at {path}. Run the Week 4 experiment first."

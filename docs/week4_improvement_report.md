@@ -20,7 +20,7 @@ If CLARA separates missing-document compliance blockers from credit-risk repayme
 | Known-failure risk accuracy | 80.00% | 100.00% | +20.00 pp | improved |
 | Adversarial compliance accuracy | 93.33% | 100.00% | +6.67 pp | improved |
 | Total failures | 3 | 0 | -3 | improved |
-| p50 latency | 7.13s | 5.34s | -1.79s | improved |
+| p50 latency | 7.13s | 5.95s | -1.18s | improved |
 
 ## Failure Movement
 
@@ -34,7 +34,7 @@ If CLARA separates missing-document compliance blockers from credit-risk repayme
 
 | Case | Original responsible agent | Failure mode | Expected | Actual |
 | --- | --- | --- | --- | --- |
-| AMB-003 | Review Synthesizer / Orchestrator | behavioral_misclassification | Outcome APPROVE; escalation False | Outcome APPROVE; escalation True |
+| AMB-003 | Review Synthesizer / Orchestrator | behavioral_misclassification | Outcome APPROVE; escalation False | Outcome ESCALATE; escalation True |
 | ADV2-003 | Compliance Checker Agent | behavioral_misclassification | Compliance status PASS | Compliance status REVIEW |
 | KF-003 | Credit Risk Scorer Agent | behavioral_misclassification | Risk band MEDIUM | Risk band LOW |
 

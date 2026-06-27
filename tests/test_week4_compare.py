@@ -3,8 +3,14 @@
 import copy
 import json
 
-from loan_pipeline.eval.week4_compare import generate_week4_improvement_report
+from loan_pipeline.eval.week4_compare import (
+    generate_week4_improvement_report,
+    render_week4_improvement_report,
+)
 from loan_pipeline.eval.week4_experiment import run_week4_baseline_experiment
+from loan_pipeline.eval.week4_historical_baseline import (
+    build_week4_historical_baseline_artifact,
+)
 
 
 def test_week4_improvement_report_writes_delta_table(tmp_path) -> None:
@@ -39,3 +45,30 @@ def test_week4_improvement_report_writes_delta_table(tmp_path) -> None:
     assert "Delta Table" in report
     assert "Risk band accuracy" in report
     assert "Failure Movement" in report
+
+
+def test_historical_baseline_preserves_documented_resolved_failures(tmp_path) -> None:
+    current_path = tmp_path / "current.json"
+    current_report_path = tmp_path / "current.md"
+
+    current = run_week4_baseline_experiment(
+        output_path=current_path,
+        report_path=current_report_path,
+    )
+    baseline = build_week4_historical_baseline_artifact(current)
+    report = render_week4_improvement_report(baseline, current)
+
+    failed_case_ids = {
+        result["case_id"]
+        for result in baseline["results"]
+        if not all(result["exact_match"].values())
+    }
+
+    assert failed_case_ids == {"AMB-003", "ADV2-003", "KF-003"}
+    assert baseline["summary"]["failure_counts"] == {
+        "Compliance Failure": 1,
+        "Orchestration Failure": 1,
+        "Risk Calibration Failure": 1,
+    }
+    assert baseline["summary"]["accuracy"]["overall"]["final_outcome_accuracy"] == 0.98
+    assert "| Resolved baseline failures | 3 | ADV2-003, AMB-003, KF-003 |" in report

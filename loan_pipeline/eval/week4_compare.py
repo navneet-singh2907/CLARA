@@ -5,14 +5,17 @@ from pathlib import Path
 from typing import Any
 
 from loan_pipeline.eval.failure_attribution import primary_attribution
-from loan_pipeline.eval.week4_experiment import DEFAULT_BASELINE_PATH
+from loan_pipeline.eval.week4_historical_baseline import (
+    DEFAULT_HISTORICAL_BASELINE_PATH,
+    load_or_create_week4_historical_baseline,
+)
 
 DEFAULT_IMPROVED_PATH = Path("output") / "week4" / "clara_week4_improved.json"
 DEFAULT_IMPROVEMENT_REPORT_PATH = Path("docs") / "week4_improvement_report.md"
 
 
 def generate_week4_improvement_report(
-    baseline_path: Path = DEFAULT_BASELINE_PATH,
+    baseline_path: Path = DEFAULT_HISTORICAL_BASELINE_PATH,
     improved_path: Path = DEFAULT_IMPROVED_PATH,
     output_path: Path = DEFAULT_IMPROVEMENT_REPORT_PATH,
 ) -> Path:
@@ -134,6 +137,8 @@ def render_week4_improvement_report(
 
 
 def _load_artifact(path: Path, label: str) -> dict[str, Any]:
+    if label == "baseline" and path == DEFAULT_HISTORICAL_BASELINE_PATH and not path.exists():
+        return load_or_create_week4_historical_baseline(source_path=DEFAULT_IMPROVED_PATH)
     if not path.exists():
         raise FileNotFoundError(
             f"Missing {label} artifact at {path}. Run the Week 4 experiment first."

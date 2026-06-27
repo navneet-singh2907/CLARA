@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from loan_pipeline.eval.week4_compare import DEFAULT_IMPROVED_PATH
-from loan_pipeline.eval.week4_experiment import DEFAULT_BASELINE_PATH
+from loan_pipeline.eval.week4_historical_baseline import DEFAULT_HISTORICAL_BASELINE_PATH
 from loan_pipeline.eval.week4_langsmith_dashboard import (
     DEFAULT_LANGSMITH_DATASET_NAME,
     DEFAULT_LANGSMITH_PROJECT_NAME,
@@ -20,7 +20,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Create a LangSmith project that compares CLARA baseline and improved runs."
     )
-    parser.add_argument("--baseline-path", type=Path, default=DEFAULT_BASELINE_PATH)
+    parser.add_argument("--baseline-path", type=Path, default=DEFAULT_HISTORICAL_BASELINE_PATH)
     parser.add_argument("--improved-path", type=Path, default=DEFAULT_IMPROVED_PATH)
     parser.add_argument("--dataset-name", default=DEFAULT_LANGSMITH_DATASET_NAME)
     parser.add_argument("--project-name", default=DEFAULT_LANGSMITH_PROJECT_NAME)
