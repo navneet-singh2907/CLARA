@@ -134,9 +134,27 @@ def test_api_readiness_endpoint() -> None:
     payload = response.json()
     assert payload["api"] == "connected"
     assert payload["app"] == "CLARA"
-    assert payload["gold_set_cases"] == 30
-    assert payload["difficulty_tiers"] == {"clean": 10, "ambiguous": 10, "adversarial": 10}
+    assert payload["gold_set_cases"] == 50
+    assert payload["difficulty_tiers"] == {
+        "adversarial": 15,
+        "ambiguous": 10,
+        "clean": 10,
+        "edge": 10,
+        "known_failure": 5,
+    }
     assert payload["live_drift_available"] is False
+
+
+def test_api_cases_endpoint_uses_week4_demo_set() -> None:
+    client = TestClient(app)
+
+    response = client.get("/cases")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 50
+    assert any(item["case_id"].startswith("KF-") for item in payload)
+    assert any(item["case_id"].startswith("EDGE-") for item in payload)
 
 
 def test_api_root_endpoint_lists_streaming_command() -> None:
@@ -173,7 +191,7 @@ def test_api_evaluation_endpoint() -> None:
     response = client.get("/evaluation")
 
     assert response.status_code == 200
-    assert response.json()["summary"]["overall"]["cases"] == 30
+    assert response.json()["summary"]["overall"]["cases"] == 50
 
 
 def test_api_ablation_endpoint() -> None:
@@ -219,7 +237,7 @@ def test_api_judge_agreement_endpoint() -> None:
     response = client.get("/judge-agreement")
 
     assert response.status_code == 200
-    assert response.json()["cases"] == 30
+    assert response.json()["cases"] == 50
 
 
 def test_api_packet_judge_agreement_endpoint() -> None:

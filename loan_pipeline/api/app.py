@@ -19,7 +19,13 @@ from loan_pipeline.api.streaming import (
     stream_live_drift_events,
     stream_review_events,
 )
-from loan_pipeline.config import get_settings, load_sba_demo_cases, offline_evaluation_context
+from loan_pipeline.config import (
+    WEEK4_GOLD_SET_JSON,
+    WEEK4_SBA_LOANS_CSV,
+    get_settings,
+    load_sba_demo_cases,
+    offline_evaluation_context,
+)
 from loan_pipeline.eval.ablation import run_ablation_study, summarize_ablation_table
 from loan_pipeline.eval.drift import run_drift_study
 from loan_pipeline.eval.inter_rater import run_inter_rater_report, run_packet_inter_rater_report
@@ -138,19 +144,19 @@ def health() -> dict[str, str]:
 @app.get("/readiness")
 def readiness() -> dict[str, Any]:
     settings = get_settings()
-    cases = load_sba_demo_cases()
+    cases = load_sba_demo_cases(WEEK4_SBA_LOANS_CSV)
     live_llm_available = settings.use_llm_agents and bool(settings.llm_api_key)
     primary_judge_available = bool(settings.primary_judge_model)
     secondary_judge_available = bool(settings.secondary_judge_model)
+    difficulty_tiers = {
+        tier: sum(1 for loan_case in cases if loan_case.difficulty_tier == tier)
+        for tier in sorted({loan_case.difficulty_tier for loan_case in cases})
+    }
     return {
         "api": "connected",
         "app": "CLARA",
         "gold_set_cases": len(cases),
-        "difficulty_tiers": {
-            "clean": sum(1 for loan_case in cases if loan_case.difficulty_tier == "clean"),
-            "ambiguous": sum(1 for loan_case in cases if loan_case.difficulty_tier == "ambiguous"),
-            "adversarial": sum(1 for loan_case in cases if loan_case.difficulty_tier == "adversarial"),
-        },
+        "difficulty_tiers": difficulty_tiers,
         "llm_mode": settings.use_llm_agents,
         "live_llm_available": live_llm_available,
         "llm_provider": settings.llm_provider,
@@ -180,7 +186,7 @@ def cases() -> list[dict[str, str]]:
             "borrower_name": loan_case.borrower_name,
             "tier": loan_case.difficulty_tier,
         }
-        for loan_case in load_sba_demo_cases()
+        for loan_case in load_sba_demo_cases(WEEK4_SBA_LOANS_CSV)
     ]
 
 
@@ -203,7 +209,9 @@ def review_pdf(payload: ReviewPdfRequest, request: Request) -> Response:
     if payload.loan_case:
         loan_case = _loan_case_from_payload(payload.loan_case)
     else:
-        cases_by_id = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
+        cases_by_id = {
+            loan_case.case_id: loan_case for loan_case in load_sba_demo_cases(WEEK4_SBA_LOANS_CSV)
+        }
         loan_case = cases_by_id.get(payload.case_id or "")
         if loan_case is None:
             return Response(f"Unknown case_id: {payload.case_id}", status_code=404)
@@ -272,20 +280,22 @@ def evaluation_stream(request: Request) -> StreamingResponse:
 def evaluation(request: Request) -> dict:
     enforce_rate_limit(request, "expensive")
     with offline_evaluation_context():
-        return run_eval()
+        return run_eval(gold_path=WEEK4_GOLD_SET_JSON, cases_path=WEEK4_SBA_LOANS_CSV)
 
 
 @app.get("/ablation")
 def ablation(request: Request) -> list[dict]:
     enforce_rate_limit(request, "expensive")
     with offline_evaluation_context():
-        return summarize_ablation_table(run_ablation_study())
+        return summarize_ablation_table(
+            run_ablation_study(gold_path=WEEK4_GOLD_SET_JSON, cases_path=WEEK4_SBA_LOANS_CSV)
+        )
 
 
 @app.get("/drift")
 def drift(repeats: int = Query(5, ge=2, le=10)) -> dict:
     with offline_evaluation_context():
-        return run_drift_study(repeats=repeats)
+        return run_drift_study(repeats=repeats, cases_path=WEEK4_SBA_LOANS_CSV)
 
 
 @app.get("/drift/live/stream")
@@ -311,7 +321,7 @@ def judge_agreement_stream(request: Request) -> StreamingResponse:
 @app.get("/judge-agreement")
 def judge_agreement(request: Request) -> dict:
     enforce_rate_limit(request, "expensive")
-    return run_inter_rater_report()
+    return run_inter_rater_report(gold_path=WEEK4_GOLD_SET_JSON, cases_path=WEEK4_SBA_LOANS_CSV)
 
 
 @app.post("/judge-agreement/packet")

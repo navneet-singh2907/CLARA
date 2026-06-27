@@ -1,6 +1,7 @@
 """Ablation study runner for the loan review pipeline."""
 
 import json
+from pathlib import Path
 from typing import Callable
 
 from loan_pipeline.agents.compliance_checker import run_compliance_checker
@@ -21,9 +22,13 @@ from loan_pipeline.graph.state import (
 AblationRunner = Callable[[LoanCase], ReviewPacket]
 
 
-def run_ablation_study() -> dict[str, object]:
-    cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
-    labels = load_gold_labels()
+def run_ablation_study(
+    gold_path: Path | None = None,
+    cases_path: Path | None = None,
+) -> dict[str, object]:
+    case_rows = load_sba_demo_cases(cases_path) if cases_path else load_sba_demo_cases()
+    cases = {loan_case.case_id: loan_case for loan_case in case_rows}
+    labels = load_gold_labels(gold_path) if gold_path else load_gold_labels()
 
     configs: dict[str, AblationRunner] = {
         "full_pipeline": run_pipeline,

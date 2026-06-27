@@ -3,6 +3,7 @@
 import hashlib
 import json
 from dataclasses import asdict
+from pathlib import Path
 from typing import Iterable
 
 from loan_pipeline.config import load_sba_demo_cases
@@ -10,14 +11,18 @@ from loan_pipeline.graph.orchestrator import run_pipeline
 from loan_pipeline.graph.state import LoanCase, ReviewPacket
 
 
-def run_drift_study(repeats: int = 5, case_ids: Iterable[str] | None = None) -> dict[str, object]:
+def run_drift_study(
+    repeats: int = 5,
+    case_ids: Iterable[str] | None = None,
+    cases_path: Path | None = None,
+) -> dict[str, object]:
     if repeats < 2:
         raise ValueError("Drift study requires at least two repeats.")
 
     selected_case_ids = set(case_ids or [])
     cases = [
         loan_case
-        for loan_case in load_sba_demo_cases()
+        for loan_case in (load_sba_demo_cases(cases_path) if cases_path else load_sba_demo_cases())
         if not selected_case_ids or loan_case.case_id in selected_case_ids
     ]
 

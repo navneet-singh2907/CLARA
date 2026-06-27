@@ -383,7 +383,7 @@ export default function Home() {
 
   async function loadEvaluation() {
     setActivityLogs((current) => current.filter((item) => item.panel !== "evaluation"));
-    await runProgressStream("/evaluation/stream", "evaluation", "Running 30-case evaluation");
+    await runProgressStream("/evaluation/stream", "evaluation", "Running 50-case evaluation");
     const payload = await loadJson<EvalResult>("/evaluation", "evaluation");
     if (payload) {
       setEvalResult(payload);
@@ -485,7 +485,7 @@ export default function Home() {
   async function loadDriftBenchmark() {
     setActivityLogs((current) => current.filter((item) => item.panel !== "drift"));
     setDriftResult(null);
-    startProgress("drift", "Running deterministic 30-case drift benchmark", 30);
+    startProgress("drift", "Running deterministic 50-case drift benchmark", 50);
     addActivityLog("drift", "benchmark_queued", "Queued offline repeated runs to verify benchmark reproducibility.");
     updateProgress({ completed: 1, current: "Starting deterministic benchmark" });
     const payload = await loadJson<DriftResult>("/drift", "drift");
@@ -838,7 +838,7 @@ export default function Home() {
           <p className="lede">
             Credit Loan Analysis & Review Agent for multi-agent small business loan review,
             live orchestration, contradiction handling, counterfactual explanations,
-            30-case evaluation, and human override audit logs.
+            50-case evaluation, and human override audit logs.
           </p>
         </div>
         <ReadinessCard readiness={readiness} readinessError={readinessError} isRunning={isRunning} />
@@ -1102,9 +1102,9 @@ function EvaluationPanel({
   return (
     <section className="panel">
       <ActionHeader
-        eyebrow="30-case gold set"
+        eyebrow="50-case gold set"
         title="Evaluation"
-        detail="Runs the same 30-case gold-set evaluation used by the Streamlit dashboard."
+        detail="Runs the same 50-case Week 4 gold-set evaluation used by the LangSmith dataset."
         buttonLabel={loading ? "Running evaluation" : "Run evaluation"}
         onRun={onRun}
         disabled={loading}
@@ -1208,7 +1208,7 @@ function DriftPanel({
             {loading ? "Running live drift" : `Run live probe: ${selectedCase}`}
           </button>
           <button className="secondary" type="button" onClick={onRunBenchmark} disabled={loading}>
-            30-case deterministic benchmark
+            50-case deterministic benchmark
           </button>
         </div>
       </div>
@@ -1346,7 +1346,7 @@ function JudgePanel({
           eyebrow="Gold-set benchmark"
           title="30-Case Judge Agreement"
           detail="Measures how often independent judge scores agree across the full gold set."
-          buttonLabel={loading ? "Running judges" : "Run 30-case judge agreement"}
+          buttonLabel={loading ? "Running judges" : "Run 50-case judge agreement"}
           onRun={onRun}
           disabled={loading}
         />
@@ -1376,7 +1376,7 @@ function JudgePanel({
             </p>
           </>
         ) : (
-          <p className="muted">Run the 30-case benchmark when you want evaluation-level inter-rater metrics.</p>
+          <p className="muted">Run the 50-case benchmark when you want evaluation-level inter-rater metrics.</p>
         )}
       </section>
     </>

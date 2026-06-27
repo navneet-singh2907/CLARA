@@ -3,6 +3,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 from loan_pipeline.config import load_sba_demo_cases
@@ -45,9 +46,12 @@ def run_inter_rater_report(
     case_ids: list[str] | None = None,
     max_workers: int = 8,
     progress_callback: ProgressCallback | None = None,
+    gold_path: Path | None = None,
+    cases_path: Path | None = None,
 ) -> dict[str, Any]:
-    cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
-    labels = load_gold_labels()
+    case_rows = load_sba_demo_cases(cases_path) if cases_path else load_sba_demo_cases()
+    cases = {loan_case.case_id: loan_case for loan_case in case_rows}
+    labels = load_gold_labels(gold_path) if gold_path else load_gold_labels()
     if case_ids is not None:
         labels_by_id = {label.case_id: label for label in labels}
         labels = [labels_by_id[case_id] for case_id in case_ids if case_id in labels_by_id]

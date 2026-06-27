@@ -5,7 +5,12 @@ from queue import Queue
 from threading import Thread
 from typing import Any, Iterable
 
-from loan_pipeline.config import get_settings, load_sba_demo_cases
+from loan_pipeline.config import (
+    WEEK4_GOLD_SET_JSON,
+    WEEK4_SBA_LOANS_CSV,
+    get_settings,
+    load_sba_demo_cases,
+)
 from loan_pipeline.eval.drift import fingerprint_review_packet
 from loan_pipeline.eval.inter_rater import run_inter_rater_report
 from loan_pipeline.eval.run_eval import load_gold_labels, run_eval
@@ -32,7 +37,7 @@ def stream_review_events(
     case_id: str,
     review_policy: ReviewPolicy = "sba_reviewer",
 ) -> Iterable[str]:
-    cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
+    cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases(WEEK4_SBA_LOANS_CSV)}
     loan_case = cases.get(case_id)
     if loan_case is None:
         yield sse_event("error", {"message": f"Unknown case_id: {case_id}"})
@@ -107,7 +112,7 @@ def stream_review_events(
 
 
 def stream_evaluation_events() -> Iterable[str]:
-    labels = load_gold_labels()
+    labels = load_gold_labels(WEEK4_GOLD_SET_JSON)
     total_cases = len(labels)
     yield sse_event("run_started", {"run_type": "evaluation", "total_cases": total_cases})
 
@@ -123,7 +128,11 @@ def stream_evaluation_events() -> Iterable[str]:
 
     def worker() -> None:
         try:
-            result = run_eval(progress_callback=emit_progress)
+            result = run_eval(
+                gold_path=WEEK4_GOLD_SET_JSON,
+                cases_path=WEEK4_SBA_LOANS_CSV,
+                progress_callback=emit_progress,
+            )
             event_queue.put(
                 sse_event(
                     "run_completed",
@@ -148,7 +157,7 @@ def stream_evaluation_events() -> Iterable[str]:
 
 
 def stream_judge_agreement_events() -> Iterable[str]:
-    total_cases = len(load_gold_labels())
+    total_cases = len(load_gold_labels(WEEK4_GOLD_SET_JSON))
     settings = get_settings()
     primary_model = settings.primary_judge_model or "local primary judge"
     secondary_model = settings.secondary_judge_model or "local strict secondary judge"
@@ -198,7 +207,11 @@ def stream_judge_agreement_events() -> Iterable[str]:
 
     def worker() -> None:
         try:
-            result = run_inter_rater_report(progress_callback=emit_progress)
+            result = run_inter_rater_report(
+                gold_path=WEEK4_GOLD_SET_JSON,
+                cases_path=WEEK4_SBA_LOANS_CSV,
+                progress_callback=emit_progress,
+            )
             event_queue.put(
                 sse_event(
                     "judge_activity",
@@ -265,7 +278,7 @@ def stream_live_drift_events(
         )
         return
 
-    cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases()}
+    cases = {loan_case.case_id: loan_case for loan_case in load_sba_demo_cases(WEEK4_SBA_LOANS_CSV)}
     loan_case = cases.get(case_id)
     if loan_case is None:
         yield sse_event("error", {"run_type": "live_drift", "message": f"Unknown case_id: {case_id}"})
