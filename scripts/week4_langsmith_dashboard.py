@@ -5,11 +5,17 @@ import json
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from loan_pipeline.eval.week4_compare import DEFAULT_IMPROVED_PATH
-from loan_pipeline.eval.week4_historical_baseline import DEFAULT_HISTORICAL_BASELINE_PATH
-from loan_pipeline.eval.week4_langsmith_dashboard import (
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
+
+from loan_pipeline.eval.week4_compare import DEFAULT_IMPROVED_PATH  # noqa: E402
+from loan_pipeline.eval.week4_historical_baseline import (  # noqa: E402
+    DEFAULT_HISTORICAL_BASELINE_PATH,
+)
+from loan_pipeline.eval.week4_langsmith_dashboard import (  # noqa: E402
     DEFAULT_LANGSMITH_DATASET_NAME,
     DEFAULT_LANGSMITH_PROJECT_NAME,
     create_week4_langsmith_dashboard,
