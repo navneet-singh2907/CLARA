@@ -32,6 +32,7 @@ from loan_pipeline.eval.inter_rater import run_inter_rater_report, run_packet_in
 from loan_pipeline.eval.report import generate_evaluation_report
 from loan_pipeline.eval.report_pdf import build_evaluation_report_pdf
 from loan_pipeline.eval.run_eval import run_eval
+from loan_pipeline.eval.week6_stress import run_week6_guardrail_stress
 from loan_pipeline.graph.orchestrator import run_pipeline
 from loan_pipeline.graph.state import LoanCase, ReviewPolicy
 from loan_pipeline.llm.client import parse_document_to_loan_case
@@ -290,6 +291,33 @@ def ablation(request: Request) -> list[dict]:
         return summarize_ablation_table(
             run_ablation_study(gold_path=WEEK4_GOLD_SET_JSON, cases_path=WEEK4_SBA_LOANS_CSV)
         )
+
+
+@app.get("/guardrails")
+def guardrails(request: Request) -> dict[str, Any]:
+    enforce_rate_limit(request, "expensive")
+    baseline = run_week6_guardrail_stress(defense_mode="baseline")
+    guarded = run_week6_guardrail_stress(defense_mode="guarded")
+    baseline_summary = baseline["summary"]
+    guarded_summary = guarded["summary"]
+    return {
+        "baseline": baseline,
+        "guarded": guarded,
+        "comparison": {
+            "baseline": baseline_summary,
+            "guarded": guarded_summary,
+            "delta": {
+                "pass_rate": round(
+                    guarded_summary["pass_rate"] - baseline_summary["pass_rate"],
+                    4,
+                ),
+                "fail_rate": round(
+                    guarded_summary["fail_rate"] - baseline_summary["fail_rate"],
+                    4,
+                ),
+            },
+        },
+    }
 
 
 @app.get("/drift")

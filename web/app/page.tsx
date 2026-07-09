@@ -16,6 +16,7 @@ import {
   Upload,
   Repeat,
   Scale,
+  ShieldAlert,
   ShieldCheck,
   UserCheck,
   Users
@@ -80,6 +81,34 @@ type PacketJudgeResult = JudgeResult & {
   dimension_deltas: Record<string, number>;
 };
 
+type GuardrailSummary = {
+  cases: number;
+  pass_rate: number;
+  warn_rate: number;
+  fail_rate: number;
+  score_counts: Record<string, number>;
+  by_family: Record<string, Record<string, number>>;
+};
+
+type GuardrailRun = {
+  defense_mode: string;
+  summary: GuardrailSummary;
+  rows: Array<Record<string, unknown>>;
+};
+
+type GuardrailResult = {
+  baseline: GuardrailRun;
+  guarded: GuardrailRun;
+  comparison: {
+    baseline: GuardrailSummary;
+    guarded: GuardrailSummary;
+    delta: {
+      pass_rate: number;
+      fail_rate: number;
+    };
+  };
+};
+
 type ProgressState = {
   panel: string;
   label: string;
@@ -139,6 +168,7 @@ const decisionOptions = [
 const tabs = [
   { id: "review", label: "Loan Review", icon: Landmark },
   { id: "evaluation", label: "Evaluation", icon: BarChart3 },
+  { id: "guardrails", label: "Guardrails", icon: ShieldAlert },
   { id: "ablation", label: "Ablation", icon: Scale },
   { id: "drift", label: "Drift", icon: Repeat },
   { id: "judges", label: "Judge Agreement", icon: Users },
@@ -162,6 +192,7 @@ export default function Home() {
   const [driftResult, setDriftResult] = useState<DriftResult | null>(null);
   const [judgeResult, setJudgeResult] = useState<JudgeResult | null>(null);
   const [packetJudgeResult, setPacketJudgeResult] = useState<PacketJudgeResult | null>(null);
+  const [guardrailResult, setGuardrailResult] = useState<GuardrailResult | null>(null);
   const [reportText, setReportText] = useState("");
   const [reportPdfReady, setReportPdfReady] = useState(false);
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
@@ -401,6 +432,37 @@ export default function Home() {
       addActivityLog("ablation", "metrics_computed", "Compared full pipeline against disabled-agent baselines.");
       setAblationRows(payload);
       finishProgress("ablation", "Ablation complete");
+    }
+  }
+
+  async function loadGuardrails() {
+    setActivityLogs((current) => current.filter((item) => item.panel !== "guardrails"));
+    setGuardrailResult(null);
+    startProgress("guardrails", "Running Week 6 guardrail stress lab", 45);
+    addActivityLog("guardrails", "attack_set_loaded", "Loaded 45 attacks across 9 guardrail families.", {
+      attack_cases: 45,
+      families: 9
+    });
+    updateProgress({ completed: 5, current: "Running baseline without guardrails" });
+    const payload = await loadJson<GuardrailResult>("/guardrails", "guardrails");
+    if (payload) {
+      addActivityLog("guardrails", "baseline_scored", "Scored unsafe baseline behavior.", {
+        pass_rate: payload.baseline.summary.pass_rate,
+        fail_rate: payload.baseline.summary.fail_rate,
+        failures: payload.baseline.summary.score_counts.FAIL
+      });
+      updateProgress({ completed: 28, current: "Running guarded pipeline" });
+      addActivityLog("guardrails", "guarded_scored", "Scored CLARA with input and output guardrails enabled.", {
+        pass_rate: payload.guarded.summary.pass_rate,
+        fail_rate: payload.guarded.summary.fail_rate,
+        failures: payload.guarded.summary.score_counts.FAIL
+      });
+      addActivityLog("guardrails", "delta_computed", "Compared baseline vs guarded safety deltas.", {
+        pass_rate_delta: payload.comparison.delta.pass_rate,
+        fail_rate_delta: payload.comparison.delta.fail_rate
+      });
+      setGuardrailResult(payload);
+      finishProgress("guardrails", "Guardrail stress lab complete");
     }
   }
 
@@ -1004,6 +1066,16 @@ export default function Home() {
         />
       )}
 
+      {activeTab === "guardrails" && (
+        <GuardrailPanel
+          result={guardrailResult}
+          loading={loadingPanel === "guardrails"}
+          onRun={loadGuardrails}
+          progress={progressState?.panel === "guardrails" ? progressState : null}
+          activityLogs={activityLogs.filter((item) => item.panel === "guardrails")}
+        />
+      )}
+
         {activeTab === "drift" && (
           <DriftPanel
             cases={cases}
@@ -1168,6 +1240,76 @@ function AblationPanel({
       <ProgressPanel progress={progress} />
       <ActivityLogPanel logs={activityLogs} title="Ablation Activity Log" emptyMessage="Run ablation to see agent-removal comparison activity." />
       {rows.length > 0 ? <DataTable rows={rows} /> : <p className="muted">Run ablation to load the comparison table.</p>}
+    </section>
+  );
+}
+
+function GuardrailPanel({
+  result,
+  loading,
+  onRun,
+  progress,
+  activityLogs
+}: {
+  result: GuardrailResult | null;
+  loading: boolean;
+  onRun: () => void;
+  progress: ProgressState | null;
+  activityLogs: ActivityLog[];
+}) {
+  const baselineFailures = result?.baseline.rows
+    .filter((row) => row.score === "FAIL")
+    .slice(0, 6)
+    .map(guardrailEvidenceRow) || [];
+  const guardedEvidence = result?.guarded.rows.slice(0, 12).map(guardrailEvidenceRow) || [];
+  const familyRows = result
+    ? Object.entries(result.guarded.summary.by_family).map(([family, counts]) => ({
+        family,
+        ...counts
+      }))
+    : [];
+
+  return (
+    <section className="panel">
+      <ActionHeader
+        eyebrow="Week 6 guardrail stress test"
+        title="Guardrail Stress Lab"
+        detail="Compares an intentionally unsafe baseline against CLARA's guarded path across jailbreaks, PII extraction, policy leakage, tool misuse, and overblocking controls."
+        buttonLabel={loading ? "Running guardrails" : "Run guardrail stress lab"}
+        onRun={onRun}
+        disabled={loading}
+      />
+      <ProgressPanel progress={progress} />
+      <ActivityLogPanel
+        logs={activityLogs}
+        title="Guardrail Activity Log"
+        emptyMessage="Run the stress lab to see baseline scoring, guarded scoring, and safety delta computation."
+      />
+      {result ? (
+        <>
+          <div className="metric-grid">
+            <Metric icon={<ShieldAlert />} label="Attack cases" value={String(result.guarded.summary.cases)} />
+            <Metric icon={<AlertTriangle />} label="Baseline pass" value={pct(result.baseline.summary.pass_rate)} />
+            <Metric icon={<ShieldCheck />} label="Guarded pass" value={pct(result.guarded.summary.pass_rate)} />
+            <Metric icon={<BadgeCheck />} label="Fail-rate delta" value={pct(result.comparison.delta.fail_rate)} />
+            <Metric
+              icon={<ClipboardCheck />}
+              label="Guarded FAIL"
+              value={String(result.guarded.summary.score_counts.FAIL || 0)}
+            />
+          </div>
+          <h3>Guarded Coverage by Attack Family</h3>
+          <DataTable rows={familyRows} />
+          <h3>Evidence Samples</h3>
+          <DataTable rows={guardedEvidence} />
+          <h3>Baseline Failure Samples</h3>
+          <DataTable rows={baselineFailures} />
+        </>
+      ) : (
+        <p className="muted">
+          Run the stress lab to load the Week 6 safety evidence table and baseline-vs-guarded comparison.
+        </p>
+      )}
     </section>
   );
 }
@@ -1739,6 +1881,18 @@ function DataTable({ rows }: { rows: Array<Record<string, unknown>> }) {
       </table>
     </div>
   );
+}
+
+function guardrailEvidenceRow(row: Record<string, unknown>) {
+  return {
+    attack_id: row.attack_id,
+    family: row.family,
+    title: row.title,
+    score: row.score,
+    expected_safe_action: row.expected_safe_action,
+    observed_behavior: row.observed_behavior,
+    recommended_defense: row.recommended_defense
+  };
 }
 
 function formatCell(value: unknown) {

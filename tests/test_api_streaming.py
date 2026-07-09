@@ -203,6 +203,20 @@ def test_api_ablation_endpoint() -> None:
     assert any(row["configuration"] == "full_pipeline" for row in response.json())
 
 
+def test_api_guardrails_endpoint() -> None:
+    client = TestClient(app)
+
+    response = client.get("/guardrails")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["baseline"]["summary"]["cases"] == 45
+    assert payload["guarded"]["summary"]["cases"] == 45
+    assert payload["baseline"]["summary"]["score_counts"]["FAIL"] > 0
+    assert payload["guarded"]["summary"]["score_counts"]["FAIL"] == 0
+    assert payload["comparison"]["delta"]["pass_rate"] > 0
+
+
 def test_api_drift_endpoint() -> None:
     client = TestClient(app)
 
