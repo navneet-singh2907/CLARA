@@ -21,7 +21,7 @@ Recommended cloud shape:
 ```text
 Project 1: CLARA API
   Root: repository root
-  Entrypoint: api/index.py
+  Entrypoint: loan_pipeline.api.app:app (configured in pyproject.toml)
   Runtime: Python
 
 Project 2: CLARA Web UI
@@ -30,7 +30,10 @@ Project 2: CLARA Web UI
   Env: NEXT_PUBLIC_API_BASE_URL=<deployed API URL>
 ```
 
-The UI can be deployed to Vercel. The backend can be deployed to Vercel for basic API routes, but long-running SSE/model calls are more reliable on a backend host that supports persistent HTTP streaming and longer request timeouts, such as Render, Railway, Fly.io, or a small VM.
+The UI and FastAPI backend can both be deployed to separate Vercel projects.
+CLARA's review SSE flow is verified on Vercel; very long evaluation jobs may
+still be more reliable on a backend host with longer request timeouts, such as
+Render, Railway, Fly.io, or a small VM.
 
 ## Local Demo
 
@@ -178,22 +181,31 @@ NEXT_PUBLIC_API_BASE_URL=https://<your-clara-api-domain>
 
 1. Create a new Vercel project from the repo root.
 2. Keep root directory as the repository root.
-3. Ensure the entrypoint exists:
+3. Keep the explicit FastAPI entrypoint in `pyproject.toml`:
 
-```text
-api/index.py
+```toml
+[tool.vercel]
+entrypoint = "loan_pipeline.api.app:app"
 ```
 
-4. Add backend environment variables in Vercel.
-5. Deploy.
-6. Verify:
+4. Do not add a catch-all rewrite to `/api/index.py`. Vercel sends the original
+   request path directly to the configured FastAPI application.
+5. Add backend environment variables in Vercel. Store model and LangSmith keys
+   as sensitive values and apply them to Preview and Production.
+6. Deploy to Preview first.
+7. Verify:
 
 ```text
 https://<api-project>.vercel.app/health
 https://<api-project>.vercel.app/readiness
+https://<api-project>.vercel.app/cases
 ```
 
-Use this for lightweight demo endpoints. If long evaluation, judge, upload, or SSE requests time out, move the backend to Option B.
+8. Run one real `/review/stream` request and require all five graph nodes plus a
+   final packet before promoting the Preview deployment.
+
+If long evaluation, judge, upload, or SSE requests exceed the Vercel function
+limit, move the backend to Option B.
 
 ### Option B: Render/Railway/Fly Backend
 

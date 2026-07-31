@@ -93,14 +93,38 @@ GET /readiness -> API connected, llm_mode=false, langsmith_tracing=false
 ```
 
 The user subsequently requested a fully live model-backed configuration for the
-video proof. The healthy environment currently has no Elastic Beanstalk
-environment properties. The local ignored `.env` contains all required Nebius,
-model, judge, and LangSmith settings; presence was verified without printing or
-exposing their values. However, the public Vercel demo now fails its first live
-term-extractor call with Nebius HTTP 401 `Couldn't authenticate`. The live Vercel
-`/readiness` endpoint still reports live mode, judges, and tracing as enabled,
-which only proves a credential is present. Do not copy the current Nebius key to
-AWS until a newly generated credential succeeds in a real Vercel review.
+video proof. The Vercel API is now repaired and fully live. The legacy catch-all
+rewrite to `/api/index.py` was removed, and `pyproject.toml` now declares the
+explicit Vercel entrypoint `loan_pipeline.api.app:app`. A `.vercelignore` file
+prevents local secrets, virtual environments, tests, the frontend project, and
+build artifacts from entering the API deployment bundle.
+
+The local ignored `.env` was used only as a secure secret source. A minimal live
+request proved the Nebius credential and configured Qwen model were valid before
+deployment. Required Nebius, model, judge, and LangSmith values were then synced
+to Vercel Preview and Production; provider and LangSmith keys are stored as
+sensitive variables. `LLM_API_KEY` and `NEBIUS_API_KEY` contain the same verified
+credential so the generic-key precedence in `loan_pipeline/config.py` cannot
+shadow the provider-specific key.
+
+Verified Vercel deployment on July 31, 2026:
+
+```text
+Project: clara-api
+Production deployment: dpl_DxFTFMcF6iRzbqQJQ9xL9nZ1QwMA
+Stable API: https://clara-api-eight.vercel.app
+Preview used for verification: dpl_14CDG2bAovWVDiuHsuHBgmHTbjhd
+Frontend: https://clara-web-beta.vercel.app
+```
+
+Production `/health`, `/readiness`, and `/cases` passed. Readiness reports live
+Nebius mode, both judge models, LangSmith tracing, and the 50-case dataset. A
+public production review of `ADV-001` completed `term_extractor`,
+`schema_validator`, `compliance_checker`, `credit_risk_scorer`, and
+`review_synthesizer` with `SUCCESS`, zero errors, and a final packet. The actual
+frontend was also run in Chrome: it reached 100%, showed `ESCALATE / HIGH / FAIL`,
+and had no browser console errors. The successful result is left open for video
+proof.
 
 AWS Console is open on the healthy environment's Configuration page. The user
 prefers to enter environment properties manually.
@@ -171,24 +195,22 @@ Local verification completed on July 31, 2026:
 
 ## Immediate Next Steps
 
-1. Generate a new Nebius API key. Update the Vercel API project and local ignored
-   `.env` without exposing the value.
-2. Redeploy the Vercel API and run one actual review. Do not rely on `/readiness`
-   alone because it does not authenticate with Nebius.
-3. After the Vercel review succeeds, manually configure the healthy AWS
+1. Persist the Vercel routing/configuration changes in Git so a later Git-based
+   deployment cannot restore the legacy rewrite.
+2. Manually configure the healthy AWS
    environment with that new Nebius key, live agent/judge settings, and LangSmith
    tracing.
-4. Wait for the AWS environment update to complete and return to Green / Ok.
-5. Verify `/health` and `/readiness`; readiness must show `llm_mode=true`,
+3. Wait for the AWS environment update to complete and return to Green / Ok.
+4. Verify `/health` and `/readiness`; readiness must show `llm_mode=true`,
    `live_llm_available=true`, `live_judges_available=true`, and
    `langsmith_tracing=true`.
-6. Run one real AWS review for the video proof and confirm the trace appears in
+5. Run one real AWS review for the video proof and confirm the trace appears in
    LangSmith.
-7. Save the healthy environment, successful-events, readiness, and live review
+6. Save the healthy environment, successful-events, readiness, and live review
    screenshots as portfolio evidence.
-8. After the user confirms the screenshots are saved, terminate
+7. After the user confirms the screenshots are saved, terminate
    `Clara-aws-demo-env-1` to stop EC2 charges.
-9. Also terminate the orphaned `Clara-aws-demo-env` environment record if it is
+8. Also terminate the orphaned `Clara-aws-demo-env` environment record if it is
    still present.
 
 ## Verification Commands

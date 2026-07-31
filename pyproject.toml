@@ -23,6 +23,9 @@ dependencies = [
 [project.scripts]
 clara-mcp-evidence = "loan_pipeline.mcp.evidence_server:main"
 
+[tool.vercel]
+entrypoint = "loan_pipeline.api.app:app"
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]
 ignore = ["E501"]
