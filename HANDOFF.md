@@ -126,6 +126,18 @@ frontend was also run in Chrome: it reached 100%, showed `ESCALATE / HIGH / FAIL
 and had no browser console errors. The successful result is left open for video
 proof.
 
+The deployment/configuration fix is committed locally on
+`feature/aws-deployment` as `e3782a2` (`fix: harden Vercel FastAPI deployment`).
+An automated push was not permitted because repository guidance reserves Git
+operations for the user. The commit contains no `.env` or `.env.local` files;
+both are ignored. Push this existing commit when authorized so the remote branch
+matches the live Vercel deployment.
+
+LangSmith tracing is enabled and configured, but the account reported HTTP 429
+because its monthly unique-trace quota is exhausted. This does not interrupt the
+review pipeline or frontend result, but new traces may not appear until the quota
+resets or the LangSmith plan/limits are changed.
+
 AWS Console is open on the healthy environment's Configuration page. The user
 prefers to enter environment properties manually.
 
@@ -195,8 +207,9 @@ Local verification completed on July 31, 2026:
 
 ## Immediate Next Steps
 
-1. Persist the Vercel routing/configuration changes in Git so a later Git-based
-   deployment cannot restore the legacy rewrite.
+1. Push local commit `e3782a2` to `origin/feature/aws-deployment` after explicit
+   Git authorization so a later Git-based deployment cannot restore the legacy
+   rewrite.
 2. Manually configure the healthy AWS
    environment with that new Nebius key, live agent/judge settings, and LangSmith
    tracing.
