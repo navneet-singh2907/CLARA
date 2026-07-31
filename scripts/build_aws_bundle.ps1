@@ -1,58 +1,133 @@
 param(
-    [string]$OutputPath = "tmp\clara-aws-elastic-beanstalk.zip"
+    [string]$OutputPath = "dist/clara-aws-elastic-beanstalk.zip"
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$resolvedOutput = Join-Path $repoRoot $OutputPath
-$outputDirectory = Split-Path -Parent $resolvedOutput
-$stagingDirectory = Join-Path $repoRoot "tmp\aws-elastic-beanstalk-staging"
-$trackedArchive = Join-Path $repoRoot "tmp\clara-aws-tracked.zip"
+$stagePath = Join-Path $repoRoot "tmp/clara-aws-bundle"
+$archivePath = Join-Path $repoRoot $OutputPath
 
-if (-not (Test-Path (Join-Path $repoRoot "docker-compose.aws.yml"))) {
-    throw "docker-compose.aws.yml was not found at the repository root."
+$requiredFiles = @(
+    "Dockerfile.api",
+    "requirements.txt",
+    "pyproject.toml",
+    "README.md",
+    ".dockerignore"
+)
+$requiredDirectories = @(
+    "api",
+    "loan_pipeline",
+    "sample_documents"
+)
+
+foreach ($relativePath in $requiredFiles + $requiredDirectories) {
+    $sourcePath = Join-Path $repoRoot $relativePath
+    if (-not (Test-Path -LiteralPath $sourcePath)) {
+        throw "Required deployment source is missing: $relativePath"
+    }
 }
 
-if (-not (Test-Path $outputDirectory)) {
-    New-Item -ItemType Directory -Path $outputDirectory | Out-Null
-}
-
-$expectedStagingRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "tmp"))
-$resolvedStaging = [System.IO.Path]::GetFullPath($stagingDirectory)
-if (-not $resolvedStaging.StartsWith($expectedStagingRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+$resolvedTmpRoot = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "tmp"))
+$resolvedStagePath = [System.IO.Path]::GetFullPath($stagePath)
+if (-not $resolvedStagePath.StartsWith(
+    "$resolvedTmpRoot\",
+    [System.StringComparison]::OrdinalIgnoreCase
+)) {
     throw "Refusing to prepare an AWS bundle outside the repository tmp directory."
 }
 
-if (Test-Path $stagingDirectory) {
-    Remove-Item -LiteralPath $stagingDirectory -Recurse -Force
+if (Test-Path -LiteralPath $resolvedStagePath) {
+    Remove-Item -LiteralPath $resolvedStagePath -Recurse -Force
 }
-if (Test-Path $trackedArchive) {
-    Remove-Item -LiteralPath $trackedArchive -Force
-}
-if (Test-Path $resolvedOutput) {
-    Remove-Item -LiteralPath $resolvedOutput -Force
-}
+New-Item -ItemType Directory -Path $resolvedStagePath -Force | Out-Null
 
-git -C $repoRoot archive --format=zip --output=$trackedArchive HEAD
-if ($LASTEXITCODE -ne 0) {
-    throw "git archive failed. Commit the AWS deployment files before building the bundle."
+Copy-Item -LiteralPath (Join-Path $repoRoot "Dockerfile.api") `
+    -Destination (Join-Path $resolvedStagePath "Dockerfile")
+foreach ($file in $requiredFiles | Where-Object { $_ -ne "Dockerfile.api" }) {
+    Copy-Item -LiteralPath (Join-Path $repoRoot $file) -Destination $resolvedStagePath
 }
 
-Expand-Archive -LiteralPath $trackedArchive -DestinationPath $stagingDirectory
-Remove-Item -LiteralPath (Join-Path $stagingDirectory "docker-compose.yml") -Force
-Copy-Item `
-    -LiteralPath (Join-Path $stagingDirectory "docker-compose.aws.yml") `
-    -Destination (Join-Path $stagingDirectory "docker-compose.yml")
-Remove-Item -LiteralPath (Join-Path $stagingDirectory "docker-compose.aws.yml") -Force
-
-if (Test-Path (Join-Path $stagingDirectory ".env")) {
-    throw "The AWS bundle unexpectedly contains .env. Refusing to package secrets."
+foreach ($directory in $requiredDirectories) {
+    Copy-Item -LiteralPath (Join-Path $repoRoot $directory) `
+        -Destination (Join-Path $resolvedStagePath $directory) -Recurse
 }
 
-Compress-Archive -Path (Join-Path $stagingDirectory "*") -DestinationPath $resolvedOutput
-Remove-Item -LiteralPath $trackedArchive -Force
+$generatedDirectories = Get-ChildItem -LiteralPath $resolvedStagePath -Directory -Recurse |
+    Where-Object { $_.Name -eq "__pycache__" } |
+    Sort-Object { $_.FullName.Length } -Descending
+foreach ($directory in $generatedDirectories) {
+    if (-not $directory.FullName.StartsWith(
+        "$resolvedStagePath\",
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+        throw "Refusing to remove a generated directory outside the staging directory."
+    }
+    Remove-Item -LiteralPath $directory.FullName -Recurse -Force
+}
 
-Write-Output "AWS Elastic Beanstalk bundle created:"
-Write-Output $resolvedOutput
-Write-Output "The bundle contains docker-compose.aws.yml as docker-compose.yml and does not contain .env."
+$archiveDirectory = Split-Path -Parent $archivePath
+New-Item -ItemType Directory -Path $archiveDirectory -Force | Out-Null
+if (Test-Path -LiteralPath $archivePath) {
+    Remove-Item -LiteralPath $archivePath -Force
+}
+
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$archiveStream = [System.IO.File]::Open(
+    $archivePath,
+    [System.IO.FileMode]::CreateNew
+)
+$archiveWriter = [System.IO.Compression.ZipArchive]::new(
+    $archiveStream,
+    [System.IO.Compression.ZipArchiveMode]::Create
+)
+try {
+    foreach ($file in Get-ChildItem -LiteralPath $resolvedStagePath -File -Recurse) {
+        $entryName = $file.FullName.Substring($resolvedStagePath.Length + 1).Replace("\", "/")
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+            $archiveWriter,
+            $file.FullName,
+            $entryName,
+            [System.IO.Compression.CompressionLevel]::Optimal
+        ) | Out-Null
+    }
+}
+finally {
+    $archiveWriter.Dispose()
+    $archiveStream.Dispose()
+}
+
+$archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
+try {
+    $entries = @($archive.Entries | ForEach-Object { $_.FullName.Replace("\", "/") })
+    $requiredEntries = @(
+        "Dockerfile",
+        "requirements.txt",
+        "pyproject.toml",
+        "README.md",
+        ".dockerignore"
+    )
+
+    if ($archive.Entries | Where-Object { $_.FullName.Contains("\") }) {
+        throw "Deployment archive validation failed. ZIP entries must use forward slashes."
+    }
+
+    foreach ($entry in $requiredEntries) {
+        if ($entries -notcontains $entry) {
+            throw "Deployment archive validation failed. Missing ZIP entry: $entry"
+        }
+    }
+
+    foreach ($directory in $requiredDirectories) {
+        if (-not ($entries | Where-Object { $_ -like "$directory/*" })) {
+            throw "Deployment archive validation failed. Missing ZIP directory: $directory/"
+        }
+    }
+}
+finally {
+    $archive.Dispose()
+}
+
+Write-Host "AWS Elastic Beanstalk bundle created and verified:"
+Write-Host $archivePath
