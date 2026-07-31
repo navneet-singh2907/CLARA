@@ -2,7 +2,9 @@
 
 ## Current Objective
 
-Deploy the CLARA FastAPI backend to AWS Elastic Beanstalk as portfolio evidence. Vercel remains the primary public demo. The AWS deployment only needs a healthy environment, successful `/health` and `/readiness` responses, and screenshots before the environment can be terminated to avoid ongoing cost.
+Temporarily deploy the complete CLARA Next.js frontend and FastAPI backend to
+the existing AWS Elastic Beanstalk environment for a full video demo. Vercel
+must remain unchanged so it can become the primary public demo again afterward.
 
 ## Product Snapshot
 
@@ -78,19 +80,47 @@ Environment: Clara-aws-demo-env-1
 Environment ID: e-8m5wpwpz8s
 Region: us-east-2
 Platform: Docker running on 64bit Amazon Linux 2023/4.13.5
-Version: clara-aws-proof-20260731-v3
+Version: clara-aws-proof-204
 Health: Green / Ok
 Domain: http://Clara-aws-demo-env-1.eba-kuxghc9b.us-east-2.elasticbeanstalk.com
 ```
 
 The latest Elastic Beanstalk events confirm that the instance deployment,
 application-version deployment, and environment update completed successfully.
-Direct endpoint verification also passed:
+Direct endpoint verification originally passed in deterministic mode:
 
 ```text
 GET /health -> {"status":"ok"}
 GET /readiness -> API connected, llm_mode=false, langsmith_tracing=false
 ```
+
+The environment was upgraded to full live functionality on July 31, 2026. The
+AWS CLI credential on the workstation was expired, so the already authenticated
+AWS Console session was used to apply the configuration to the same healthy
+environment. Twelve environment properties were loaded directly from the local
+ignored `.env` without printing or committing their values. Elastic Beanstalk
+reported `Environment update completed successfully` and `Successfully deployed
+new configuration to environment` at 12:21:09 (UTC-4), and the environment
+overview returned to Health `Ok`.
+
+Current AWS verification:
+
+```text
+GET /health -> 200 {"status":"ok"}
+GET /readiness -> llm_mode=true, live_llm_available=true,
+                  live_judges_available=true, langsmith_tracing=true,
+                  langsmith_project=CLARA-AWS
+Live ADV-001 review -> all five graph nodes SUCCESS, zero errors, final packet
+Live packet judges -> both judge results returned, no API error
+Sample PDF intake -> DOC-11E772B7, final packet returned, no API error
+Review PDF export -> valid PDF, 6,525 bytes
+```
+
+The live review exercised `term_extractor`, `schema_validator`,
+`credit_risk_scorer`, `compliance_checker`, and `review_synthesizer` against the
+Nebius provider on the AWS domain. The sample document was
+`Northstar_Custom_Cabinets_Loan_Profile.pdf` and completed extraction plus the
+same live review graph.
 
 The user subsequently requested a fully live model-backed configuration for the
 video proof. The Vercel API is now repaired and fully live. The legacy catch-all
@@ -138,21 +168,17 @@ because its monthly unique-trace quota is exhausted. This does not interrupt the
 review pipeline or frontend result, but new traces may not appear until the quota
 resets or the LangSmith plan/limits are changed.
 
-AWS Console is open on the healthy environment's Configuration page. The user
-prefers to enter environment properties manually.
+AWS Console is open on the healthy environment's Events page showing the
+successful configuration update. No commit or push was performed during the AWS
+configuration work, per the user's instruction to ask first.
 
 The prior `Clara-aws-demo-env` remains an orphaned historical environment whose
 CloudFormation stack `awseb-e-32zfmfpy32-stack` no longer exists. Do not attempt
 another deployment to it.
 
-For the AWS proof deployment, use:
-
-```text
-USE_LLM_AGENTS=false
-LANGSMITH_TRACING=false
-```
-
-No model or LangSmith secrets are required for this proof.
+The AWS environment is intentionally in live mode for the full-functionality
+video proof. Do not switch `USE_LLM_AGENTS` or `LANGSMITH_TRACING` back to false
+until the evidence is captured.
 
 ## Packaging Status
 
@@ -207,24 +233,100 @@ Local verification completed on July 31, 2026:
 
 ## Immediate Next Steps
 
-1. Push local commit `e3782a2` to `origin/feature/aws-deployment` after explicit
-   Git authorization so a later Git-based deployment cannot restore the legacy
-   rewrite.
-2. Manually configure the healthy AWS
-   environment with that new Nebius key, live agent/judge settings, and LangSmith
-   tracing.
-3. Wait for the AWS environment update to complete and return to Green / Ok.
-4. Verify `/health` and `/readiness`; readiness must show `llm_mode=true`,
-   `live_llm_available=true`, `live_judges_available=true`, and
-   `langsmith_tracing=true`.
-5. Run one real AWS review for the video proof and confirm the trace appears in
-   LangSmith.
-6. Save the healthy environment, successful-events, readiness, and live review
-   screenshots as portfolio evidence.
-7. After the user confirms the screenshots are saved, terminate
-   `Clara-aws-demo-env-1` to stop EC2 charges.
-8. Also terminate the orphaned `Clara-aws-demo-env` environment record if it is
-   still present.
+1. Record the video proof from the open AWS CLARA tab. It is already showing the
+   completed `ADV-001` result at 100% with `ESCALATE / HIGH / FAIL`.
+2. LangSmith trace uploads may not appear until the exhausted monthly unique-trace
+   quota resets; this does not interrupt the pipeline.
+3. Do not commit or push without the user's explicit permission. After the demo,
+   use the unchanged Vercel frontend again and terminate the AWS environments to
+   stop EC2 charges.
+
+## AWS Full-Stack Bundle History (Superseded)
+
+This section describes the original source-build artifact. Its AWS deployment
+timed out because the small EC2 instance spent more than 15 minutes building
+the frontend. It has been superseded by the prebuilt bundle documented below.
+The implementation remains deliberately uncommitted. It adds
+`Dockerfile.aws-fullstack`, a two-process
+supervisor in `scripts/start_aws_fullstack.py`, conditional same-origin API
+rewrites in `web/next.config.ts`, and
+`scripts/build_aws_fullstack_bundle.ps1`. The production Vercel fallback is
+unchanged; an intentionally empty `NEXT_PUBLIC_API_BASE_URL` is used only by the
+AWS image.
+
+The final container uses the Python 3.12 slim base so Uvicorn retains its native
+OpenSSL dependencies, copies in Node 22 for the standalone Next.js server, binds
+Next.js to port 8000, and binds FastAPI internally to 127.0.0.1:8001. The first
+local smoke run caught and corrected the missing OpenSSL runtime issue before
+deployment.
+
+Verified locally on July 31, 2026:
+
+```text
+Next.js production build -> passed
+Frontend ESLint -> passed
+Ruff -> passed
+Pytest -> 138 passed, one third-party ReportLab warning
+Docker production image -> built successfully
+GET / on combined container -> 200
+GET /health and /readiness through same origin -> passed
+GET /cases through same origin -> 50 cases
+ADV-001 SSE through same origin -> five SUCCESS nodes, final packet returned
+```
+
+Final archive:
+
+```text
+dist/clara-aws-fullstack-elastic-beanstalk.zip
+190,432 bytes
+SHA256 50957DDD6542E5A73CE4B03365DB66F797625B393AEB1C6F3EBC2BFABBDBE717
+```
+
+The archive and Docker context explicitly exclude `.env*`, `node_modules`,
+`.next`, `out`, `__pycache__`, and `*.pyc`.
+
+## AWS Full-Stack Deployment Final State
+
+The first source-build deployment (`clara-aws-fullstack-20260731-v1`) timed out
+after 15 minutes and left the instance temporarily unresponsive. The exact EC2
+instance was rebooted, then the known-good `clara-aws-proof-20260731-v3` version
+was redeployed successfully to restore Health `Ok`.
+
+To avoid building Next.js on the small instance, the frontend is now built
+locally and packaged with `Dockerfile.aws-fullstack-prebuilt` and
+`scripts/build_aws_prebuilt_bundle.ps1`. The final AWS bundle is:
+
+```text
+dist/clara-aws-fullstack-prebuilt-elastic-beanstalk.zip
+3,932,439 bytes
+SHA256 04F33C4A767F36AA92DD19A944E081E2DFFC7FB3147A8553509EB036E01E9F45
+```
+
+The first prebuilt upload deployed as `clara-aws-proof-203`, but its Windows
+build used an empty `NEXT_PUBLIC_API_BASE_URL`; PowerShell removed that variable
+and Next.js compiled the Vercel/local fallback. This was corrected by using the
+explicit `__SAME_ORIGIN__` build marker in `web/app/page.tsx`,
+`Dockerfile.aws-fullstack`, and `scripts/build_aws_prebuilt_bundle.ps1`.
+
+The corrected bundle deployed successfully as `clara-aws-proof-204`. Elastic
+Beanstalk reports Health `Ok`. Chrome verification on the AWS domain confirmed:
+
+```text
+System readiness -> Ready
+Loan cases -> loaded from the same-origin FastAPI backend
+ADV-001 live review -> 100%
+term_extractor -> completed
+schema_validator -> completed
+compliance_checker -> completed
+credit_risk_scorer -> completed
+review_synthesizer -> completed
+Final packet -> ESCALATE / HIGH risk / Compliance FAIL / human gate required
+```
+
+The successful run had multi-second model-agent durations and no 401 or stream
+error. The completed result is left open in Chrome for video proof. Focused AWS
+configuration tests passed (5/5), frontend lint passed, and the corrected
+Next.js production build passed. No commit or push was made for this work.
 
 ## Verification Commands
 
