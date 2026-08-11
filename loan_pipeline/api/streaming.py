@@ -70,16 +70,17 @@ def stream_review_events(
                                 "status": trace_entry.status,
                             },
                         )
-                    yield sse_event(
-                        "agent_completed",
-                        {
-                            "node": trace_entry.node,
-                            "stage": trace_entry.stage,
-                            "parallel_group": trace_entry.parallel_group,
-                            "duration_ms": trace_entry.duration_ms,
-                            "status": trace_entry.status,
-                        },
-                    )
+                    else:
+                        yield sse_event(
+                            "agent_completed",
+                            {
+                                "node": trace_entry.node,
+                                "stage": trace_entry.stage,
+                                "parallel_group": trace_entry.parallel_group,
+                                "duration_ms": trace_entry.duration_ms,
+                                "status": trace_entry.status,
+                            },
+                        )
 
                 if update.get("review_packet") is not None:
                     review_packet = update["review_packet"]

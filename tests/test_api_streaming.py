@@ -68,7 +68,13 @@ def test_review_stream_emits_agent_failed_for_specialist_failure(monkeypatch) ->
 
     events = list(stream_review_events("CLEAN-001"))
 
-    assert any(event.startswith("event: agent_failed") for event in events)
+    failed_events = [event for event in events if event.startswith("event: agent_failed")]
+    completed_events = [event for event in events if event.startswith("event: agent_completed")]
+
+    assert any(_event_payload(event)["node"] == "compliance_checker" for event in failed_events)
+    assert not any(
+        _event_payload(event)["node"] == "compliance_checker" for event in completed_events
+    )
     assert any(event.startswith("event: run_completed") for event in events)
     packet_event = next(event for event in events if event.startswith("event: run_completed"))
     payload = _event_payload(packet_event)
@@ -224,6 +230,27 @@ def test_api_drift_endpoint() -> None:
 
     assert response.status_code == 200
     assert response.json()["repeats"] == 2
+
+
+def test_api_drift_endpoint_uses_expensive_rate_limit(monkeypatch) -> None:
+    monkeypatch.setenv("RATE_LIMIT_EXPENSIVE_REQUESTS", "1")
+    monkeypatch.setenv("RATE_LIMIT_WINDOW_SECONDS", "3600")
+    monkeypatch.setattr(
+        api_app,
+        "run_drift_study",
+        lambda *, repeats, cases_path: {"repeats": repeats, "cases_path": str(cases_path)},
+    )
+    reset_settings_cache()
+    reset_rate_limits()
+    client = TestClient(app)
+
+    first_response = client.get("/drift?repeats=2")
+    second_response = client.get("/drift?repeats=2")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.json()["detail"]["bucket"] == "expensive"
+    assert "Retry-After" in second_response.headers
 
 
 def test_live_drift_stream_requires_llm_mode() -> None:

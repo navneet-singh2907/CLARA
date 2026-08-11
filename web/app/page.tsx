@@ -238,8 +238,8 @@ export default function Home() {
     void loadInitialState();
   }, [selectedCase]);
 
-  const completedAgents = useMemo(
-    () => events.filter((item) => item.event === "agent_completed"),
+  const terminalAgentEvents = useMemo(
+    () => events.filter((item) => item.event === "agent_completed" || item.event === "agent_failed"),
     [events]
   );
   const finalEvent = useMemo(
@@ -265,7 +265,7 @@ export default function Home() {
     }
     return null;
   }, [finalEvent, uploadedReview]);
-  const progress = Math.min(100, Math.round((completedAgents.length / 5) * 100));
+  const progress = Math.min(100, Math.round((terminalAgentEvents.length / 5) * 100));
   const timelineTargets = useMemo(() => {
     const uploadedTargets = uploadedReview?.audit_targets;
     if (Array.isArray(uploadedTargets) && uploadedTargets.length > 0) {
@@ -311,7 +311,14 @@ export default function Home() {
       selectedCase
     )}&policy=${encodeURIComponent(policy)}`;
     const source = new EventSource(url);
-    const eventNames = ["run_started", "agent_completed", "graph_update", "run_completed", "error"];
+    const eventNames = [
+      "run_started",
+      "agent_completed",
+      "agent_failed",
+      "graph_update",
+      "run_completed",
+      "error"
+    ];
 
     eventNames.forEach((eventName) => {
       source.addEventListener(eventName, (message) => {
@@ -1995,16 +2002,18 @@ function uploadedAgentEvent(
 }
 
 function formatEventTitle(item: StreamEvent) {
-  if (item.event === "agent_completed") {
-    return String(item.data.node || "agent completed").replaceAll("_", " ");
+  if (item.event === "agent_completed" || item.event === "agent_failed") {
+    const node = String(item.data.node || "agent").replaceAll("_", " ");
+    return item.event === "agent_failed" ? `${node} failed` : node;
   }
   return item.event.replaceAll("_", " ");
 }
 
 function formatEventDetail(item: StreamEvent) {
-  if (item.event === "agent_completed") {
+  if (item.event === "agent_completed" || item.event === "agent_failed") {
     const parallel = item.data.parallel_group ? ` | ${String(item.data.parallel_group)}` : "";
-    return `${String(item.data.stage)}${parallel} | ${String(item.data.duration_ms)} ms`;
+    const status = item.event === "agent_failed" ? " | ERROR" : "";
+    return `${String(item.data.stage)}${parallel} | ${String(item.data.duration_ms)} ms${status}`;
   }
   if (item.event === "graph_update") {
     return `Graph updated by ${String(item.data.node)}.`;

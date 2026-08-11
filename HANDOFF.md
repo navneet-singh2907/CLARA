@@ -335,6 +335,48 @@ Next.js production build passed. No commit or push was made for this work.
 .\.venv\Scripts\python.exe -m ruff check loan_pipeline tests
 ```
 
+## Review Findings (August 10-11, 2026)
+
+A review stress audit found two reproducible defects. Both were fixed and
+covered by regression tests on August 11. No commit, push, or deployment was
+made.
+
+Original defects:
+
+1. Failed graph nodes were hidden by the Next.js timeline. The SSE backend
+   emitted both `agent_failed` and `agent_completed` (with `status=ERROR`) for a
+   failed trace. The frontend did not subscribe to `agent_failed` and counted
+   every `agent_completed` event toward its five-node progress total. A simulated
+   compliance-agent outage therefore produced five `agent_completed` events,
+   100% progress, and no visible failed-agent event.
+2. `GET /drift` did not call `enforce_rate_limit`, although one request could run
+   all 50 cases up to 10 times. With `RATE_LIMIT_EXPENSIVE_REQUESTS=1`, two
+   consecutive `/drift?repeats=2` calls both returned HTTP 200. As a control,
+   the protected `/report` endpoint returned HTTP 429 on the second request.
+
+Resolution:
+
+1. `stream_review_events` now emits exactly one terminal SSE event per trace:
+   `agent_failed` for an error or `agent_completed` for success. The Next.js
+   client subscribes to `agent_failed`, renders it as an error, and includes
+   both success and failure terminal events in progress without mislabeling a
+   failure as completed.
+2. `GET /drift` now accepts `Request` and enforces the existing `expensive`
+   rate-limit bucket before starting the drift study.
+3. Regression coverage verifies the failed specialist is not also emitted as
+   completed, the browser SSE contract includes failure events, and the second
+   drift request returns HTTP 429 when the expensive limit is one.
+
+Audit verification:
+
+```text
+Focused regression tests: 31 passed, 1 third-party ReportLab warning
+Full pytest: 141 passed, 1 third-party ReportLab warning
+Ruff: passed
+Frontend ESLint: passed
+Next.js production build: passed
+```
+
 ## Collaboration Notes
 
 - Explain each meaningful change and why it is needed.

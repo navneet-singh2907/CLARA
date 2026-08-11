@@ -22,6 +22,6 @@ web/out/
 docs/*.docx
 docs/*.pdf
 docs/cv_bullets.md
-
-.vercel
-.env*
+.AGENTS.md
+.HANDOFF.md
+.dist

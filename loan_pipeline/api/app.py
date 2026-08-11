@@ -321,7 +321,8 @@ def guardrails(request: Request) -> dict[str, Any]:
 
 
 @app.get("/drift")
-def drift(repeats: int = Query(5, ge=2, le=10)) -> dict:
+def drift(request: Request, repeats: int = Query(5, ge=2, le=10)) -> dict:
+    enforce_rate_limit(request, "expensive")
     with offline_evaluation_context():
         return run_drift_study(repeats=repeats, cases_path=WEEK4_SBA_LOANS_CSV)
 
