@@ -384,3 +384,20 @@ Next.js production build: passed
 - The user handles Git unless they explicitly ask Codex to do it.
 - Never expose or commit API keys.
 - Preserve the working Vercel deployment and existing evaluation artifacts.
+
+## Planned Amazon Bedrock Migration (August 11, 2026)
+
+A planning-only, local-only runbook was added at
+`docs/aws-bedrock-deployment-plan.md`. The user explicitly requested that this
+file not be committed, so its exact path is listed in `.gitignore`. No AWS
+setting, source code, dependency, commit, push, or deployment was changed for
+this plan.
+
+The plan keeps the Next.js/FastAPI/LangGraph container on the existing Elastic
+Beanstalk environment and swaps only the model client to
+`ChatBedrockConverse`. It recommends a least-privilege policy on the EB EC2
+instance profile, no long-lived AWS access keys, staged regression testing, a
+new `clara-aws-bedrock-v1` application version, and `clara-aws-proof-204` as the
+rollback target. Because the repository pins LangChain 0.3, dependency
+compatibility must be preserved rather than installing `langchain-aws` 1.x
+blindly.
