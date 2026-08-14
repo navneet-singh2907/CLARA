@@ -25,4 +25,5 @@ docs/cv_bullets.md
 /docs/aws-bedrock-deployment-plan.md
 .AGENTS.md
 .HANDOFF.md
-.dist
+dist/
+.vercel/

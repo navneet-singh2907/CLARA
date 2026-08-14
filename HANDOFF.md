@@ -500,3 +500,106 @@ them from the environment and revoke the provider credential after the user
 confirms the rollback window is closed. `clara-aws-proof-204` remains the
 application-version rollback target. Do not commit or push these uncommitted
 changes without fresh user permission.
+
+### Video retry diagnosis (August 14, 2026)
+
+The dashboard later displayed `CLARA live stream is not connected` during a
+video attempt. AWS was not down: Elastic Beanstalk reported Health `Ok`, and
+`/health`, `/readiness`, and `/cases` returned HTTP 200. The review endpoint
+returned HTTP 429 because the in-memory public-demo review bucket had reached
+its configured limit of 10 requests per 3,600 seconds during deployment smoke
+testing. The observed `Retry-After` was 1,735 seconds (about 29 minutes).
+
+There is also an unfixed frontend error-reporting defect. `runPipeline` registers
+`error` with the named SSE event handlers and immediately parses
+`MessageEvent.data`. A native EventSource connection error is a plain `Event`,
+so the handler attempts `JSON.parse(undefined)` before `source.onerror` shows
+the generic disconnected banner. This makes a quota response look like a dead
+backend. No code, AWS property, deployment, commit, or push was changed during
+this diagnosis. Immediate options are to wait for the window to expire or, with
+explicit user permission, temporarily raise `RATE_LIMIT_REVIEW_REQUESTS` for
+video recording. A later source fix should guard the named error handler against
+plain EventSource errors and surface quota failures accurately.
+
+The user then explicitly authorized the immediate demo workaround before going
+to sleep. `RATE_LIMIT_REVIEW_REQUESTS=100` was added to the Elastic Beanstalk
+environment. The configuration update completed successfully, Health returned
+to `Ok`, and `/readiness` reported `review_requests: 100`, provider `bedrock`,
+and live model availability. A direct `ADV-001` SSE run completed all five
+agents with zero failures/errors, and a fresh Chrome run reached 100% with
+`ESCALATE / HIGH / FAIL` and no disconnected banner. That completed result is
+left open for recording. No source code, model permission, commit, or push was
+changed for this quota-only workaround.
+
+### README deployment evidence (August 14, 2026)
+
+The README now includes an `AWS Bedrock Deployment Proof` section with all six
+user-provided screenshots: Elastic Beanstalk health, Bedrock readiness, the
+complete five-agent timeline, the final decision packet, uploaded-PDF judge
+progress, and primary/secondary judge scores. The screenshots were copied to
+`docs/assets/aws-bedrock/` with descriptive filenames. The README includes an
+empty `Live AWS Bedrock video` Markdown link for the user to fill in later and
+retains the Vercel public-demo link. No commit or push was performed.
+
+### AWS teardown completed (August 14, 2026)
+
+After explicit user confirmation, the CLARA AWS deployment was permanently
+removed. The `Clara-aws-demo` Elastic Beanstalk application was deleted with
+both `Clara-aws-demo-env-1` and suspended `Clara-aws-demo-env`; the console now
+shows `Applications (0)`. The termination events reported that EC2 instance
+`i-02462a390024682a4` was removed from the environment, and the former public
+hostname no longer resolves. A CloudFormation search for active `awseb` stacks
+in `us-east-2` returned `Stacks (0)`.
+
+The CLARA-specific inline IAM policy `ClaraBedrockInvokeHaiku45` was permanently
+deleted from `aws-elasticbeanstalk-service-role`. All seven CLARA application
+version ZIPs and the retained `resources/` environment-log tree were deleted
+from the Elastic Beanstalk S3 bucket. The shared bucket was intentionally
+preserved and now contains only AWS's zero-byte `.elasticbeanstalk` marker.
+Shared Elastic Beanstalk managed policies/role, default networking, and
+unrelated AWS resources were preserved. No CLARA compute or endpoint remains
+running. No commit or push was performed.
+
+### Vercel restoration status (August 14, 2026)
+
+The public frontend and API domains still exist and return HTTP 200:
+
+```text
+Frontend: https://clara-web-beta.vercel.app/
+API: https://clara-api-eight.vercel.app/
+```
+
+However, an end-to-end production SSE review is not currently functional. The
+production API deployment starts and reports live Nebius readiness, but an
+`ADV-001` review retried the upstream `/chat/completions` call and returned an
+SSE error after approximately 94 seconds. The Nebius variables in Vercel were
+last set on July 31; a fresh valid provider credential is required before the
+deployment can be called fully live.
+
+Vercel branch/deployment inspection found:
+
+- Production is the older manually promoted `feature/aws-deployment` commit
+  `5382d27` and is marked Ready, despite the failed real model call.
+- The latest `feature/aws-deployment` commit `81fe34b` failed its API preview
+  build because the Python bundle was 235.04 MB against a 225 MB limit.
+- `hardening/contextual-llm-errors` has a Ready preview, but it uses the same
+  project-level provider variables and therefore is not a credential fix.
+
+The build failure was traced to the repository-level custom install command in
+`vercel.json`, exactly as reported by Vercel. That command was removed locally
+so Vercel can apply its native FastAPI dependency packaging. The JSON parses,
+the full backend suite passes (146 tests), and Ruff passes. This edit remains
+uncommitted and unpushed because the user requires explicit permission before
+either Git action. Other existing uncommitted README/HANDOFF/screenshot changes
+must not be included accidentally in any narrowly scoped Vercel commit.
+
+The user is considering merging `feature/aws-deployment` into `main`. The branch
+is functionally suitable for a merge and has now been cleaned locally. All five
+generated ZIP archives under `dist/` plus `.vercel/project.json` and
+`.vercel/README.txt` are pending deletion. The `.gitignore` typo `.dist` was
+corrected to `dist/`, and `.vercel/` was added. AWS/Bedrock source, deployment
+scripts, regression fixes, tests, docs, and README evidence were preserved.
+`git diff --check` passes. Because the archives exist in earlier branch commits,
+use a squash merge into `main` after committing the final cleaned tree so the
+intermediate deployment commits are not added to `main`. No commit, merge, or
+push has been performed yet.
