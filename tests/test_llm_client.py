@@ -14,6 +14,7 @@ from loan_pipeline.llm.client import (
     _invoke_json_prompt,
     _parse_json_content,
 )
+from loan_pipeline.llm.provider import is_llm_configured, response_text
 
 
 def test_coerce_confidence_accepts_numeric_and_labels() -> None:
@@ -94,8 +95,59 @@ def test_llm_invocation_error_includes_context_and_timeout(monkeypatch) -> None:
     assert "LLM call failed" in str(exc_info.value)
 
 
-def _test_settings() -> Settings:
-    return Settings(
+def test_bedrock_invocation_uses_aws_region_without_api_key(monkeypatch) -> None:
+    captured_kwargs: dict[str, Any] = {}
+
+    class FakeResponse:
+        content = [{"type": "text", "text": '{"status":"ok"}'}]
+
+    class FakeChatBedrockConverse:
+        def __init__(self, **kwargs: Any) -> None:
+            captured_kwargs.update(kwargs)
+
+        def invoke(self, prompt: str) -> FakeResponse:
+            assert prompt == "score this case"
+            return FakeResponse()
+
+    fake_module = ModuleType("langchain_aws")
+    fake_module.ChatBedrockConverse = FakeChatBedrockConverse
+    monkeypatch.setitem(sys.modules, "langchain_aws", fake_module)
+    settings = _test_settings(
+        llm_provider="bedrock",
+        llm_api_key=None,
+        bedrock_model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        aws_region="us-east-2",
+    )
+
+    payload = _invoke_json_prompt(
+        settings=settings,
+        prompt="score this case",
+        agent_name="term_extractor",
+        case_id="CLEAN-001",
+        operation="extract_terms",
+    )
+
+    assert payload == {"status": "ok"}
+    assert captured_kwargs == {
+        "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "region_name": "us-east-2",
+        "temperature": 0.2,
+    }
+    assert is_llm_configured(settings)
+
+
+def test_response_text_joins_bedrock_text_blocks() -> None:
+    class Response:
+        content = [
+            {"type": "text", "text": '{"status":'},
+            {"type": "text", "text": '"ok"}'},
+        ]
+
+    assert response_text(Response()) == '{"status":"ok"}'
+
+
+def _test_settings(**overrides: Any) -> Settings:
+    values: dict[str, Any] = dict(
         app_env="test",
         use_llm_agents=True,
         openai_api_key=None,
@@ -103,6 +155,8 @@ def _test_settings() -> Settings:
         llm_api_key="test-key",
         llm_base_url="https://api.tokenfactory.nebius.com/v1/",
         llm_provider="nebius",
+        bedrock_model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        aws_region="us-east-2",
         llm_temperature=0.2,
         primary_judge_model=None,
         secondary_judge_model=None,
@@ -115,3 +169,5 @@ def _test_settings() -> Settings:
         rate_limit_expensive_requests=100,
         rate_limit_upload_requests=100,
     )
+    values.update(overrides)
+    return Settings(**values)

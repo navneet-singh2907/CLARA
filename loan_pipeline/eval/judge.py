@@ -7,6 +7,7 @@ from typing import Any
 from loan_pipeline.config import get_settings
 from loan_pipeline.eval.metrics import GoldLabel
 from loan_pipeline.graph.state import LoanCase, ReviewPacket
+from loan_pipeline.llm.provider import build_chat_model, is_llm_configured, response_text
 
 JUDGE_DIMENSIONS = [
     "faithfulness",
@@ -164,22 +165,18 @@ def run_model_judge(
     model: str,
 ) -> JudgeScore:
     settings = get_settings()
-    if not settings.llm_api_key:
-        raise RuntimeError("Live judge models require LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY.")
+    if not is_llm_configured(settings):
+        raise RuntimeError(
+            "Live judge models require Bedrock IAM configuration or a provider API_KEY."
+        )
 
-    from langchain_openai import ChatOpenAI
-
-    llm = ChatOpenAI(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
+    llm = build_chat_model(
+        settings,
         model=model,
         temperature=settings.judge_temperature,
     )
     response = llm.invoke(build_judge_prompt(loan_case, packet, gold))
-    content = response.content if hasattr(response, "content") else str(response)
-    if not isinstance(content, str):
-        content = str(content)
-    return parse_judge_response(content)
+    return parse_judge_response(response_text(response))
 
 
 def run_configured_primary_packet_judge(packet_text: str) -> JudgeScore:
@@ -198,22 +195,18 @@ def run_configured_secondary_packet_judge(packet_text: str) -> JudgeScore:
 
 def run_model_packet_judge(packet_text: str, model: str) -> JudgeScore:
     settings = get_settings()
-    if not settings.llm_api_key:
-        raise RuntimeError("Live packet judges require LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY.")
+    if not is_llm_configured(settings):
+        raise RuntimeError(
+            "Live packet judges require Bedrock IAM configuration or a provider API_KEY."
+        )
 
-    from langchain_openai import ChatOpenAI
-
-    llm = ChatOpenAI(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
+    llm = build_chat_model(
+        settings,
         model=model,
         temperature=settings.judge_temperature,
     )
     response = llm.invoke(build_packet_judge_prompt(packet_text))
-    content = response.content if hasattr(response, "content") else str(response)
-    if not isinstance(content, str):
-        content = str(content)
-    return parse_judge_response(content)
+    return parse_judge_response(response_text(response))
 
 
 def validate_judge_payload(payload: dict[str, Any]) -> JudgeScore:

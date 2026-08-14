@@ -2,13 +2,17 @@
 
 import json
 import os
+from typing import Any
 
+import loan_pipeline.eval.judge as judge_module
 from loan_pipeline.config import load_sba_demo_cases, reset_settings_cache
 from loan_pipeline.eval.judge import (
     build_judge_prompt,
+    build_packet_judge_prompt,
     parse_judge_response,
     run_configured_primary_judge,
     run_local_judge,
+    run_model_packet_judge,
 )
 from loan_pipeline.eval.run_eval import load_gold_labels
 from loan_pipeline.graph.orchestrator import run_pipeline
@@ -161,6 +165,53 @@ def test_configured_primary_judge_requires_api_key_when_model_set() -> None:
         _restore_env("NEBIUS_API_KEY", old_nebius_key)
         _restore_env("LLM_API_KEY", old_llm_key)
         reset_settings_cache()
+
+
+def test_bedrock_packet_judge_uses_shared_provider(monkeypatch) -> None:
+    model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    captured: dict[str, Any] = {}
+
+    class FakeResponse:
+        content = [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    {
+                        "faithfulness": 5,
+                        "completeness": 4,
+                        "risk_calibration": 5,
+                        "compliance_accuracy": 5,
+                        "explainability": 4,
+                        "overall_score": 5,
+                        "major_failure_category": "None",
+                        "rationale": "Grounded and useful.",
+                    }
+                ),
+            }
+        ]
+
+    class FakeModel:
+        def invoke(self, prompt: str) -> FakeResponse:
+            captured["prompt"] = prompt
+            return FakeResponse()
+
+    def fake_build_chat_model(settings, **kwargs):
+        captured["provider"] = settings.llm_provider
+        captured.update(kwargs)
+        return FakeModel()
+
+    monkeypatch.setenv("LLM_PROVIDER", "bedrock")
+    monkeypatch.setenv("BEDROCK_MODEL_ID", model_id)
+    monkeypatch.setenv("AWS_REGION", "us-east-2")
+    monkeypatch.setattr(judge_module, "build_chat_model", fake_build_chat_model)
+    reset_settings_cache()
+
+    score = run_model_packet_judge("CLARA packet", model_id)
+
+    assert score.overall_score == 5
+    assert captured["provider"] == "bedrock"
+    assert captured["model"] == model_id
+    assert captured["prompt"] == build_packet_judge_prompt("CLARA packet")
 
 
 def _restore_env(name: str, value: str | None) -> None:

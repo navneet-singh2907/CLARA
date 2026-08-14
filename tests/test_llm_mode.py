@@ -5,6 +5,7 @@ import os
 from loan_pipeline.agents.credit_risk_scorer import run_credit_risk_scorer
 from loan_pipeline.agents.term_extractor import extract_terms
 from loan_pipeline.config import get_settings, load_sba_demo_cases, reset_settings_cache
+from loan_pipeline.llm.provider import is_llm_configured, selected_model
 
 
 def test_llm_mode_defaults_off() -> None:
@@ -70,6 +71,22 @@ def test_nebius_provider_configuration_is_supported() -> None:
         _restore_env("NEBIUS_BASE_URL", old_base_url)
         _restore_env("OPENAI_MODEL", old_model)
         reset_settings_cache()
+
+
+def test_bedrock_provider_uses_iam_without_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "bedrock")
+    monkeypatch.setenv("BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+    monkeypatch.setenv("AWS_REGION", "us-east-2")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("NEBIUS_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    reset_settings_cache()
+
+    settings = get_settings()
+
+    assert is_llm_configured(settings)
+    assert selected_model(settings) == "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    assert settings.llm_api_key is None
 
 
 def test_deterministic_agents_run_without_api_key_when_llm_mode_off() -> None:

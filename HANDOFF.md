@@ -401,3 +401,102 @@ new `clara-aws-bedrock-v1` application version, and `clara-aws-proof-204` as the
 rollback target. Because the repository pins LangChain 0.3, dependency
 compatibility must be preserved rather than installing `langchain-aws` 1.x
 blindly.
+
+## Amazon Bedrock Migration Progress (August 13, 2026)
+
+The migration is now implemented and verified locally, but it has not yet been
+deployed or committed. Amazon Bedrock access was enabled in `us-east-2`, and a
+playground request to the US Claude Haiku 4.5 inference profile returned the
+requested JSON successfully.
+
+The Elastic Beanstalk instance profile is
+`aws-elasticbeanstalk-service-role`. After explicit user confirmation, the
+inline policy `ClaraBedrockInvokeHaiku45` was attached to that role. It grants
+only `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` for the
+Claude Haiku 4.5 US inference profile and its foundation model. No AWS access
+keys or Anthropic API keys were created or added to the application.
+
+Uncommitted source changes add a provider-neutral model factory shared by the
+five review agents and both live judge paths. `LLM_PROVIDER=bedrock` selects
+`ChatBedrockConverse`, uses the EC2 role credential chain, and normalizes both
+string and Bedrock content-block responses. Readiness and live drift now treat
+Bedrock IAM configuration as valid without an LLM API key. The existing Nebius
+and OpenAI-compatible path remains supported. The compatible dependency is
+`langchain-aws==0.2.10`; do not upgrade this repository to `langchain-aws` 1.x
+without migrating the existing LangChain 0.3 stack.
+
+Verification completed:
+
+```text
+Focused Bedrock/provider/API tests -> 53 passed
+Full pytest -> 146 passed, one third-party ReportLab warning
+Ruff -> passed
+pip check -> no broken requirements
+Frontend ESLint -> passed
+Next.js production build -> passed
+Exact staged Docker image -> built successfully on Python 3.12
+Container GET / -> 200
+Container GET /health -> ok
+Container GET /readiness -> API connected
+Container GET /cases -> 50 cases
+```
+
+Verified deployment archive:
+
+```text
+dist/clara-aws-bedrock-v1-elastic-beanstalk.zip
+3,933,902 bytes
+SHA256 D609DE711CDCFAF9B50E276A75C1DEFD499ECF63E579AD726DFE6C3009E7E158
+Archive entries: 1,180
+Unsafe .env/cache/bytecode entries: 0
+```
+
+The verified archive was deployed as `clara-aws-bedrock-v1`. The application
+version was first deployed with the existing Nebius properties; Health returned
+to `Ok`, readiness stayed live, and `ADV-001` completed all five agents with no
+failure or error events. This proved that the new provider factory preserved
+the rollback provider before the configuration switch.
+
+The environment was then updated separately with:
+
+```text
+LLM_PROVIDER=bedrock
+BEDROCK_MODEL_ID=us.anthropic.claude-haiku-4-5-20251001-v1:0
+AWS_REGION=us-east-2
+PRIMARY_JUDGE_MODEL=us.anthropic.claude-haiku-4-5-20251001-v1:0
+SECONDARY_JUDGE_MODEL=us.anthropic.claude-haiku-4-5-20251001-v1:0
+```
+
+Elastic Beanstalk reported `Environment update completed successfully` and
+Health `Ok`. Current AWS state:
+
+```text
+Environment: Clara-aws-demo-env-1
+Version: clara-aws-bedrock-v1
+Platform: Docker running on 64bit Amazon Linux 2023/4.13.6
+Provider: bedrock
+Model: us.anthropic.claude-haiku-4-5-20251001-v1:0
+Live LLM: available
+Live judges: available
+Live drift: available
+```
+
+AWS Bedrock smoke verification:
+
+```text
+GET /health -> 200 ok
+GET /readiness -> bedrock, Haiku 4.5, all live features available
+ADV-001 SSE -> five agent_completed, zero agent_failed/error, final packet
+Chrome ADV-001 -> 100%, ESCALATE / HIGH / FAIL, human gate required
+Northstar PDF intake -> DOC-11E772B7, ESCALATE / LOW / FAIL
+Live packet judges -> primary 4/5, secondary 4/5, no API error
+Review PDF export -> 200 application/pdf, valid %PDF signature, 6,702 bytes
+```
+
+The completed Bedrock `ADV-001` result is left open in Chrome for video proof.
+The prior external-provider keys remain in Elastic Beanstalk only for the short
+rollback window; they were not displayed, copied, or added to source. Remove
+them from the environment and revoke the provider credential after the user
+confirms the rollback window is closed. `clara-aws-proof-204` remains the
+application-version rollback target. Do not commit or push these uncommitted
+changes without fresh user permission.

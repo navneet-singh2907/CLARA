@@ -31,6 +31,8 @@ class Settings:
     llm_api_key: str | None
     llm_base_url: str | None
     llm_provider: str
+    bedrock_model_id: str
+    aws_region: str
     llm_temperature: float
     primary_judge_model: str | None
     secondary_judge_model: str | None
@@ -49,7 +51,9 @@ def get_settings() -> Settings:
     nebius_api_key = os.getenv("NEBIUS_API_KEY") or None
     openai_api_key = os.getenv("OPENAI_API_KEY") or None
     llm_base_url = os.getenv("LLM_BASE_URL") or os.getenv("NEBIUS_BASE_URL") or None
-    llm_provider = os.getenv("LLM_PROVIDER") or ("nebius" if nebius_api_key else "openai")
+    llm_provider = (
+        os.getenv("LLM_PROVIDER") or ("nebius" if nebius_api_key else "openai")
+    ).strip().lower()
 
     return Settings(
         app_env=os.getenv("APP_ENV", "local"),
@@ -59,6 +63,11 @@ def get_settings() -> Settings:
         llm_api_key=os.getenv("LLM_API_KEY") or nebius_api_key or openai_api_key,
         llm_base_url=llm_base_url,
         llm_provider=llm_provider,
+        bedrock_model_id=os.getenv(
+            "BEDROCK_MODEL_ID",
+            "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        ),
+        aws_region=os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-2",
         llm_temperature=float(os.getenv("LLM_TEMPERATURE", "0.2")),
         primary_judge_model=os.getenv("PRIMARY_JUDGE_MODEL") or None,
         secondary_judge_model=os.getenv("SECONDARY_JUDGE_MODEL") or None,

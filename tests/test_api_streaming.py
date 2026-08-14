@@ -151,6 +151,28 @@ def test_api_readiness_endpoint() -> None:
     assert payload["live_drift_available"] is False
 
 
+def test_api_readiness_reports_bedrock_available_without_api_key(monkeypatch) -> None:
+    model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    monkeypatch.setenv("USE_LLM_AGENTS", "true")
+    monkeypatch.setenv("LLM_PROVIDER", "bedrock")
+    monkeypatch.setenv("BEDROCK_MODEL_ID", model_id)
+    monkeypatch.setenv("AWS_REGION", "us-east-2")
+    monkeypatch.setenv("PRIMARY_JUDGE_MODEL", model_id)
+    monkeypatch.setenv("SECONDARY_JUDGE_MODEL", model_id)
+    reset_settings_cache()
+    client = TestClient(app)
+
+    response = client.get("/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["llm_provider"] == "bedrock"
+    assert payload["llm_model"] == model_id
+    assert payload["live_llm_available"] is True
+    assert payload["live_judges_available"] is True
+    assert payload["live_drift_available"] is True
+
+
 def test_api_cases_endpoint_uses_week4_demo_set() -> None:
     client = TestClient(app)
 
