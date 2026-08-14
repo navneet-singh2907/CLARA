@@ -603,3 +603,14 @@ scripts, regression fixes, tests, docs, and README evidence were preserved.
 use a squash merge into `main` after committing the final cleaned tree so the
 intermediate deployment commits are not added to `main`. No commit, merge, or
 push has been performed yet.
+
+The cleanup commit was subsequently created and pushed by the user as
+`ea951b6` (`chore: prepare AWS deployment branch for merge`). Its Vercel API
+preview completed, but the `clara-web` preview failed in three seconds. The
+frontend build log showed that the repository-level `.vercelignore` removed the
+entire `web/` directory before the configured `npm ci` step, so Vercel could not
+find `package-lock.json`. Locally, `.vercelignore` now preserves the frontend
+source and replaces `web/` with targeted ignores for `web/node_modules/`,
+`web/.next/`, and `web/out/`. Frontend ESLint and the Next.js production build
+both pass. This narrow fix is uncommitted and unpushed; suggested commit text is
+`fix: preserve frontend files in Vercel builds`.

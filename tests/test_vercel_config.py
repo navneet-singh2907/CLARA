@@ -13,9 +13,18 @@ def test_vercel_uses_explicit_fastapi_entrypoint_without_legacy_rewrite() -> Non
     assert pyproject["tool"]["vercel"]["entrypoint"] == "loan_pipeline.api.app:app"
 
 
-def test_vercel_bundle_excludes_local_secrets_and_non_runtime_projects() -> None:
+def test_vercel_bundle_preserves_frontend_source_but_excludes_generated_files() -> None:
     ignored_paths = set(
         (REPOSITORY_ROOT / ".vercelignore").read_text(encoding="utf-8").splitlines()
     )
 
-    assert {".env*", ".venv/", ".vercel/", "web/", "tests/"} <= ignored_paths
+    assert {
+        ".env*",
+        ".venv/",
+        ".vercel/",
+        "tests/",
+        "web/node_modules/",
+        "web/.next/",
+        "web/out/",
+    } <= ignored_paths
+    assert "web/" not in ignored_paths
