@@ -17,6 +17,7 @@ from loan_pipeline.eval.run_eval import load_gold_labels, run_eval
 from loan_pipeline.graph.orchestrator import build_review_graph, run_pipeline
 from loan_pipeline.graph.state import ReviewPolicy, initial_state
 from loan_pipeline.llm.client import LLMResponseError
+from loan_pipeline.llm.provider import is_llm_configured
 
 
 def sse_event(event: str, data: dict[str, Any]) -> str:
@@ -70,16 +71,17 @@ def stream_review_events(
                                 "status": trace_entry.status,
                             },
                         )
-                    yield sse_event(
-                        "agent_completed",
-                        {
-                            "node": trace_entry.node,
-                            "stage": trace_entry.stage,
-                            "parallel_group": trace_entry.parallel_group,
-                            "duration_ms": trace_entry.duration_ms,
-                            "status": trace_entry.status,
-                        },
-                    )
+                    else:
+                        yield sse_event(
+                            "agent_completed",
+                            {
+                                "node": trace_entry.node,
+                                "stage": trace_entry.stage,
+                                "parallel_group": trace_entry.parallel_group,
+                                "duration_ms": trace_entry.duration_ms,
+                                "status": trace_entry.status,
+                            },
+                        )
 
                 if update.get("review_packet") is not None:
                     review_packet = update["review_packet"]
@@ -268,12 +270,12 @@ def stream_live_drift_events(
             },
         )
         return
-    if not settings.llm_api_key:
+    if not is_llm_configured(settings):
         yield sse_event(
             "error",
             {
                 "run_type": "live_drift",
-                "message": "Live drift requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY.",
+                "message": "Live drift requires a configured LLM provider.",
             },
         )
         return

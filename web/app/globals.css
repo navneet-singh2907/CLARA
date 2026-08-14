@@ -452,7 +452,8 @@ button:disabled {
   background: var(--good);
 }
 
-.dot.error {
+.dot.error,
+.dot.agent_failed {
   background: var(--accent-strong);
 }
 

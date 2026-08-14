@@ -22,3 +22,8 @@ web/out/
 docs/*.docx
 docs/*.pdf
 docs/cv_bullets.md
+/docs/aws-bedrock-deployment-plan.md
+.AGENTS.md
+.HANDOFF.md
+dist/
+.vercel/

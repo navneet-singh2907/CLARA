@@ -36,6 +36,7 @@ from loan_pipeline.eval.week6_stress import run_week6_guardrail_stress
 from loan_pipeline.graph.orchestrator import run_pipeline
 from loan_pipeline.graph.state import LoanCase, ReviewPolicy
 from loan_pipeline.llm.client import parse_document_to_loan_case
+from loan_pipeline.llm.provider import is_llm_configured, selected_model
 from loan_pipeline.review.pdf_export import build_review_packet_pdf
 
 app = FastAPI(
@@ -146,9 +147,10 @@ def health() -> dict[str, str]:
 def readiness() -> dict[str, Any]:
     settings = get_settings()
     cases = load_sba_demo_cases(WEEK4_SBA_LOANS_CSV)
-    live_llm_available = settings.use_llm_agents and bool(settings.llm_api_key)
-    primary_judge_available = bool(settings.primary_judge_model)
-    secondary_judge_available = bool(settings.secondary_judge_model)
+    provider_configured = is_llm_configured(settings)
+    live_llm_available = settings.use_llm_agents and provider_configured
+    primary_judge_available = provider_configured and bool(settings.primary_judge_model)
+    secondary_judge_available = provider_configured and bool(settings.secondary_judge_model)
     difficulty_tiers = {
         tier: sum(1 for loan_case in cases if loan_case.difficulty_tier == tier)
         for tier in sorted({loan_case.difficulty_tier for loan_case in cases})
@@ -161,7 +163,7 @@ def readiness() -> dict[str, Any]:
         "llm_mode": settings.use_llm_agents,
         "live_llm_available": live_llm_available,
         "llm_provider": settings.llm_provider,
-        "llm_model": settings.openai_model,
+        "llm_model": selected_model(settings),
         "llm_temperature": settings.llm_temperature if live_llm_available else None,
         "primary_judge": settings.primary_judge_model or "local deterministic judge",
         "secondary_judge": settings.secondary_judge_model or "local strict judge",
@@ -321,7 +323,8 @@ def guardrails(request: Request) -> dict[str, Any]:
 
 
 @app.get("/drift")
-def drift(repeats: int = Query(5, ge=2, le=10)) -> dict:
+def drift(request: Request, repeats: int = Query(5, ge=2, le=10)) -> dict:
+    enforce_rate_limit(request, "expensive")
     with offline_evaluation_context():
         return run_drift_study(repeats=repeats, cases_path=WEEK4_SBA_LOANS_CSV)
 

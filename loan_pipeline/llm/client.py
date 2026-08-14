@@ -5,8 +5,6 @@ import json
 from dataclasses import asdict, replace
 from typing import Any
 
-from pydantic import SecretStr
-
 from loan_pipeline.config import Settings, get_settings
 from loan_pipeline.graph.state import ComplianceResult, ExtractedTerms, LoanCase, RiskResult
 from loan_pipeline.llm.prompts import (
@@ -14,6 +12,12 @@ from loan_pipeline.llm.prompts import (
     DOCUMENT_PARSE_PROMPT,
     RISK_RATIONALE_PROMPT,
     TERM_EXTRACTION_PROMPT,
+)
+from loan_pipeline.llm.provider import (
+    build_chat_model,
+    is_llm_configured,
+    response_text,
+    selected_model,
 )
 
 LLM_TIMEOUT_SECONDS = 30.0
@@ -175,9 +179,11 @@ def parse_document_to_loan_case(document_text: str) -> LoanCase:
 
 def _require_llm_settings() -> Settings:
     settings = get_settings()
-    if not settings.llm_api_key:
+    if not is_llm_configured(settings):
         raise RuntimeError(
-            "USE_LLM_AGENTS=true requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY."
+            "USE_LLM_AGENTS=true requires a configured LLM provider. "
+            "Bedrock uses the AWS credential chain; OpenAI-compatible providers require "
+            "LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY."
         )
     return settings
 
@@ -190,21 +196,11 @@ def _invoke_json_prompt(
     case_id: str | None = None,
     operation: str,
 ) -> dict[str, Any]:
-    from langchain_openai import ChatOpenAI
-
     provider = settings.llm_provider
-    model = settings.openai_model
+    model = selected_model(settings)
     temperature = settings.llm_temperature
-    api_key = settings.llm_api_key
-    if api_key is None:
-        raise RuntimeError(
-            "USE_LLM_AGENTS=true requires LLM_API_KEY, NEBIUS_API_KEY, or OPENAI_API_KEY."
-        )
-
-    llm = ChatOpenAI(
-        api_key=SecretStr(api_key),
-        base_url=settings.llm_base_url,
-        model=model,
+    llm = build_chat_model(
+        settings,
         temperature=temperature,
         timeout=LLM_TIMEOUT_SECONDS,
     )
@@ -222,9 +218,7 @@ def _invoke_json_prompt(
             temperature=temperature,
         ) from exc
 
-    content = response.content if hasattr(response, "content") else str(response)
-    if not isinstance(content, str):
-        content = str(content)
+    content = response_text(response)
 
     return _parse_json_content(
         content,

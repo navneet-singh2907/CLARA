@@ -5,13 +5,46 @@
 
 CLARA is a LangChain + LangGraph product for reviewing small business loan applications with specialist agents, human-in-the-loop audit controls, rigorous evaluation, and exportable review packets.
 
-Live link - https://clara-web-beta.vercel.app/
+**Public demo:** [CLARA on Vercel](https://clara-web-beta.vercel.app/)
+
+**Live AWS Bedrock video:** [Watch the end-to-end demo]()
+<!-- Add the final video URL inside the parentheses above. -->
 
 ## Portfolio Summary
 
 This project treats agentic AI as a high-stakes financial decision-support workflow rather than a simple automation demo. A LangGraph orchestrator coordinates specialist agents for term extraction, compliance review, and credit risk scoring. The system then surfaces contradictions, generates counterfactual explanations, supports reviewer policy modes, logs human overrides, exports a PDF review packet, and evaluates performance against a structured 50-case SBA-style Week 4 gold set.
 
-Default mode is deterministic so evaluation is reproducible. Live LangChain-backed LLM mode is the differentiator for the Agentic AI demo: it routes agents and judge models through an OpenAI-compatible provider such as Nebius, displays live per-case progress for long evaluation runs, and can emit LangSmith traces for observability.
+Default mode is deterministic so evaluation is reproducible. Live LangChain-backed LLM mode is the differentiator for the Agentic AI demo: it can route agents and judge models through Amazon Bedrock using IAM or through an OpenAI-compatible provider such as Nebius, displays live per-case progress for long evaluation runs, and can emit LangSmith traces for observability.
+
+## AWS Bedrock Deployment Proof
+
+The full CLARA application is deployed as a Docker workload on AWS Elastic Beanstalk. FastAPI, LangGraph orchestration, the five-agent workflow, and the Next.js interface run together on Elastic Beanstalk, while model calls use Claude Haiku 4.5 through Amazon Bedrock and the EC2 instance profile. This AWS path does not require an Anthropic API key.
+
+**1. Elastic Beanstalk environment healthy and running the Bedrock release**
+
+![AWS Elastic Beanstalk environment showing CLARA health as Ok and the Bedrock release running](docs/assets/aws-bedrock/clara-elastic-beanstalk-deployment.png)
+
+**2. Runtime readiness confirms Bedrock, live agents, judges, and drift checks**
+
+![CLARA readiness response showing the Bedrock provider and live model features available](docs/assets/aws-bedrock/clara-bedrock-readiness.png)
+
+**3. Complete five-agent LangGraph execution**
+
+<p align="center">
+  <img src="docs/assets/aws-bedrock/clara-bedrock-agent-timeline.png" alt="CLARA five-agent LangGraph timeline completing successfully" width="560">
+</p>
+
+**4. Final review packet produced by the live AWS workflow**
+
+![CLARA loan review completing at 100 percent with an escalation decision and high-risk rating](docs/assets/aws-bedrock/clara-bedrock-review-summary.png)
+
+**5. Generated PDF submitted to two independent judges**
+
+![CLARA uploaded packet judge workflow completing at 100 percent](docs/assets/aws-bedrock/clara-bedrock-packet-judge-progress.png)
+
+**6. Primary and secondary judge results**
+
+![CLARA primary and secondary judge scores showing 100 percent exact agreement](docs/assets/aws-bedrock/clara-bedrock-judge-scores.png)
 
 ## Why It Matters
 
@@ -20,6 +53,7 @@ Loan review decisions can affect whether a small business receives capital, surv
 ## Highlights
 
 - LangGraph fan-out/fan-in orchestration with parallel specialist review
+- Full-stack AWS Elastic Beanstalk deployment with Claude on Amazon Bedrock through IAM
 - Agents for term extraction, compliance checking, and credit risk scoring
 - Reviewer policy mode for SBA reviewer, bank underwriter, and CDFI lender postures
 - Contradiction detection between compliance and credit-risk outputs

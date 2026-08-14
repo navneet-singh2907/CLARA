@@ -6,9 +6,11 @@ __pycache__
 .pytest_cache
 .ruff_cache
 .env
+.env*
 tmp
 output
 reports
+docs
 web/node_modules
 web/.next
 web/out
