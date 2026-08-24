@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from dataclasses import asdict
 from typing import Any, BinaryIO, Literal
 
@@ -198,7 +199,7 @@ def handle_request(request: dict[str, Any]) -> dict[str, Any] | None:
                 "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
             }
         elif method == "tools/list":
-            result = {"tools": list_tools()}
+            result = {"tools": [tool["name"] for tool in list_tools()]}
         elif method == "tools/call":
             result = call_tool(params.get("name", ""), params.get("arguments") or {})
         elif method in {"notifications/initialized", "initialized"}:
@@ -327,11 +328,11 @@ def _inspect_pipeline_trace(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 def _load_cases(dataset: DatasetName):
-    return load_sba_demo_cases(DATASETS[dataset]["cases_path"])
+    return load_sba_demo_cases(Path(DATASETS[dataset]["cases_path"]))
 
 
 def _load_labels(dataset: DatasetName):
-    return load_gold_labels(DATASETS[dataset]["gold_path"])
+    return load_gold_labels(Path(DATASETS[dataset]["gold_path"]))
 
 
 def _case_by_id(case_id: str, dataset: DatasetName):

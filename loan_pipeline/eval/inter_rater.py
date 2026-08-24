@@ -174,7 +174,7 @@ def run_packet_inter_rater_report(packet_text: str, artifact_name: str = "upload
         "exact_agreement": _ratio(delta == 0 for delta in comparisons),
         "within_one_point_agreement": _ratio(delta <= 1 for delta in comparisons),
         "average_score_delta": round(sum(comparisons) / len(comparisons), 4),
-        "highest_disagreement_dimension": max(dimension_deltas, key=dimension_deltas.get),
+        "highest_disagreement_dimension": max(dimension_deltas, key=dimension_deltas.__getitem__),
         "disagreement_case_count": 1 if any(delta > 0 for delta in comparisons) else 0,
         "dimension_deltas": dimension_deltas,
         "manual_spot_check_cases": [

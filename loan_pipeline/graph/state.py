@@ -195,6 +195,7 @@ def validate_terms_node(state: GraphState) -> GraphState:
         errors.append("Years in business cannot be negative.")
 
     return {
+        **state,
         "validation_errors": errors,
         "execution_trace": [
             ExecutionTraceEntry(

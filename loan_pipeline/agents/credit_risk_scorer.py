@@ -4,6 +4,7 @@ from loan_pipeline.config import get_settings
 from loan_pipeline.graph.state import ExtractedTerms, ReviewPolicy, RiskResult
 from loan_pipeline.llm.client import add_llm_risk_rationale
 from loan_pipeline.review.policies import get_policy_profile
+from typing import cast, Literal
 
 
 def run_credit_risk_scorer(
@@ -101,7 +102,7 @@ def run_credit_risk_scorer_deterministic(
 
     return RiskResult(
         score=score,
-        band=band,
+        band=cast(Literal["LOW", "MEDIUM", "HIGH"], band),
         confidence=max(confidence, 0.50),
         primary_risk_factors=primary_risk_factors,
         mitigating_factors=mitigating_factors,

@@ -49,7 +49,11 @@ def run_compliance_checker_deterministic(
         )
 
     if terms.guarantee_ratio > profile.compliance_guarantee_review_threshold:
-        severity = "HIGH" if terms.guarantee_ratio > profile.compliance_guarantee_high_threshold else "MEDIUM"
+        severity: Literal["HIGH", "MEDIUM"] = (
+            "HIGH"
+            if terms.guarantee_ratio > profile.compliance_guarantee_high_threshold
+            else "MEDIUM"
+        )
         findings.append(
             ComplianceFinding(
                 rule_id="SBA-001",
@@ -70,7 +74,13 @@ def run_compliance_checker_deterministic(
         )
 
     has_high = any(finding.severity == "HIGH" for finding in findings)
-    status = "FAIL" if has_high else "REVIEW" if findings else "PASS"
+    status: Literal["PASS", "REVIEW", "FAIL"] = (
+        "FAIL"
+        if has_high
+        else "REVIEW"
+        if findings
+        else "PASS"
+    )
     confidence = 0.90 if findings else 0.95
 
     return ComplianceResult(status=status, findings=findings, confidence=confidence)
