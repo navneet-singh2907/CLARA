@@ -2,7 +2,7 @@
 
 import re
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 GuardrailSeverity = Literal["low", "medium", "high", "critical"]
 GuardrailAction = Literal["allow", "refuse", "mask", "escalate", "quarantine"]
@@ -170,8 +170,8 @@ def inspect_input_prompt(prompt: str) -> GuardrailDecision:
                 GuardrailFinding(
                     rule_id=rule_id,
                     category=category,
-                    severity=severity,
-                    action=action,
+                    severity=cast(Literal['low', 'medium', 'high', 'critical'], severity),
+                    action=cast(Literal['allow', 'refuse', 'mask', 'escalate', 'quarantine'], action),
                     reason=reason,
                 )
             )
@@ -224,8 +224,8 @@ def inspect_output_response(response: str) -> GuardrailDecision:
                 GuardrailFinding(
                     rule_id=rule_id,
                     category=category,
-                    severity=severity,
-                    action=action,
+                    severity=cast(Literal['low', 'medium', 'high', 'critical'], severity),
+                    action=cast(Literal['allow', 'refuse', 'mask', 'escalate', 'quarantine'], action),
                     reason=reason,
                 )
             )

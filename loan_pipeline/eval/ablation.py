@@ -122,6 +122,8 @@ def _single_agent_compliance_guess(terms: ExtractedTerms) -> ComplianceResult:
 
 
 def _single_agent_risk_guess(terms: ExtractedTerms) -> RiskResult:
+    from typing import Literal
+    band: Literal["LOW", "MEDIUM", "HIGH"]
     if terms.prior_default or terms.loan_amount >= 900000:
         band = "HIGH"
         score = 4
@@ -142,7 +144,7 @@ def _single_agent_risk_guess(terms: ExtractedTerms) -> RiskResult:
     )
 
 
-def summarize_ablation_table(results: dict[str, object]) -> list[dict[str, object]]:
+def summarize_ablation_table(results: dict[str, dict[str, object]]) -> list[dict[str, object]]:
     rows = []
     for config_name, metrics in results.items():
         rows.append({"configuration": config_name, **metrics})

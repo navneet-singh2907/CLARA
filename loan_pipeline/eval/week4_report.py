@@ -213,7 +213,7 @@ def _tier_extremes(by_tier: dict[str, dict[str, float | int]]) -> tuple[str, str
         / 3
         for tier, summary in by_tier.items()
     }
-    return max(scored, key=scored.get), min(scored, key=scored.get)
+    return max(scored, key=lambda tier: scored[tier]), min(scored, key=lambda tier: scored[tier])
 
 
 def _format_counter(counts: dict[str, int]) -> str:
