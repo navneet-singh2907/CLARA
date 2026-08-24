@@ -158,15 +158,7 @@ def _ablation_table(rows: list[dict[str, Any]]) -> str:
     ]
     for row in rows:
         lines.append(
-            "| {configuration} | {cases} | {term} | {compliance} | {risk} | {escalation} | {outcome} |".format(
-                configuration=row["configuration"],
-                cases=row["cases"],
-                term=_pct(row["term_extraction_accuracy"]),
-                compliance=_pct(row["compliance_status_accuracy"]),
-                risk=_pct(row["risk_band_accuracy"]),
-                escalation=_pct(row["escalation_accuracy"]),
-                outcome=_pct(row["final_outcome_accuracy"]),
-            )
+            f"| {row['configuration']} | {row['cases']} | {_pct(row['term_extraction_accuracy'])} | {_pct(row['compliance_status_accuracy'])} | {_pct(row['risk_band_accuracy'])} | {_pct(row['escalation_accuracy'])} | {_pct(row['final_outcome_accuracy'])} |"
         )
     return "\n".join(lines)
 
@@ -207,14 +199,7 @@ def _confidence_calibration(eval_result: dict[str, Any]) -> str:
     ]
     for bucket in calibration["buckets"]:
         lines.append(
-            "| {bucket} | {cases} | {confidence} | {accuracy} | {gap} | {case_ids} |".format(
-                bucket=bucket["confidence_bucket"],
-                cases=bucket["cases"],
-                confidence=_pct(bucket["average_confidence"]),
-                accuracy=_pct(bucket["observed_accuracy"]),
-                gap=_pct(bucket["calibration_gap"]),
-                case_ids=", ".join(bucket["case_ids"]),
-            )
+            f"| {bucket['confidence_bucket']} | {bucket['cases']} | {_pct(bucket['average_confidence'])} | {_pct(bucket['observed_accuracy'])} | {_pct(bucket['calibration_gap'])} | {', '.join(bucket['case_ids'])} |"
         )
     return "\n".join(lines)
 
