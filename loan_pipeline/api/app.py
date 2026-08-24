@@ -465,9 +465,9 @@ async def _extract_upload_text(file: UploadFile) -> str:
 def _parse_uploaded_loan_case(document_text: str) -> LoanCase:
     try:
         return _validate_uploaded_loan_case(parse_document_to_loan_case(document_text))
-    except HTTPException:
-        raise
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise
         return _parse_uploaded_loan_case_fallback(document_text)
 
 
