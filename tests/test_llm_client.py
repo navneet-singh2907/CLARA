@@ -71,7 +71,8 @@ def test_llm_invocation_error_includes_context_and_timeout(monkeypatch) -> None:
         def __init__(self, **kwargs: Any) -> None:
             captured_kwargs.update(kwargs)
 
-        def invoke(self, prompt: str) -> object:
+        @staticmethod
+        def invoke(prompt: str) -> object:
             raise TimeoutError(f"Timed out while handling {prompt}")
 
     fake_module = ModuleType("langchain_openai")
@@ -105,7 +106,8 @@ def test_bedrock_invocation_uses_aws_region_without_api_key(monkeypatch) -> None
         def __init__(self, **kwargs: Any) -> None:
             captured_kwargs.update(kwargs)
 
-        def invoke(self, prompt: str) -> FakeResponse:
+        @staticmethod
+        def invoke(prompt: str) -> FakeResponse:
             assert prompt == "score this case"
             return FakeResponse()
 
