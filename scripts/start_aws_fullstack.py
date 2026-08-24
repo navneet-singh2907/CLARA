@@ -34,7 +34,7 @@ def main() -> int:
 
     api_environment = os.environ.copy()
     web_environment = os.environ.copy()
-    web_environment.update({"HOSTNAME": "0.0.0.0", "PORT": WEB_PORT})
+    web_environment.update({"HOSTNAME": "127.0.0.1", "PORT": WEB_PORT})
 
     processes = [
         subprocess.Popen(
