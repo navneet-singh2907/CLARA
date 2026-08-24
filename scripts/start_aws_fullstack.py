@@ -52,7 +52,7 @@ def main() -> int:
             env=api_environment,
         ),
         subprocess.Popen(
-            ["node", str(NEXT_SERVER)],
+            ["/usr/bin/node", str(NEXT_SERVER)],
             cwd=NEXT_SERVER.parent,
             env=web_environment,
         ),
