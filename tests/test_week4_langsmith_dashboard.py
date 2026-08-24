@@ -31,7 +31,8 @@ class FakeLangSmithClient:
         self.examples.append(kwargs)
         return SimpleNamespace(id=f"example-{len(self.examples)}")
 
-    def read_project(self, *, project_name: str, include_stats: bool = False):
+    @staticmethod
+    def read_project(*, project_name: str, include_stats: bool = False):
         return SimpleNamespace(id="existing-project-123", name=project_name)
 
     def create_project(self, project_name: str, **kwargs):

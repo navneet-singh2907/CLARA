@@ -191,7 +191,8 @@ def test_bedrock_packet_judge_uses_shared_provider(monkeypatch) -> None:
         ]
 
     class FakeModel:
-        def invoke(self, prompt: str) -> FakeResponse:
+        @staticmethod
+        def invoke(prompt: str) -> FakeResponse:
             captured["prompt"] = prompt
             return FakeResponse()
 
