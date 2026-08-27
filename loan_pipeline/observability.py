@@ -2,11 +2,12 @@
 
 import os
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 from langsmith import traceable
 
 T = TypeVar("T")
+RunType = Literal["tool", "chain", "llm", "retriever", "embedding", "prompt", "parser"]
 
 
 def langsmith_tracing_enabled() -> bool:
@@ -16,7 +17,7 @@ def langsmith_tracing_enabled() -> bool:
 def trace_call(
     *,
     name: str,
-    run_type: str,
+    run_type: RunType,
     func: Callable[..., T],
     args: tuple[Any, ...] = (),
     kwargs: dict[str, Any] | None = None,

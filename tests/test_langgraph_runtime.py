@@ -3,6 +3,7 @@
 import loan_pipeline.graph.orchestrator as orchestrator
 from loan_pipeline.config import load_sba_demo_cases
 from loan_pipeline.graph.orchestrator import build_review_graph, run_pipeline_with_state
+from loan_pipeline.graph.state import initial_state, validate_terms_node
 
 
 def test_review_graph_compiles_and_invokes() -> None:
@@ -37,6 +38,16 @@ def test_review_graph_compiles_and_invokes() -> None:
         if entry.parallel_group == "specialist_review"
     }
     assert parallel_nodes == {"compliance_checker", "credit_risk_scorer"}
+
+
+def test_validator_returns_structured_error_when_terms_are_missing() -> None:
+    state = initial_state(load_sba_demo_cases()[0])
+
+    update = validate_terms_node(state)
+
+    assert update["validation_errors"] == ["Term validation requires extracted terms."]
+    assert update["agent_errors"] == ["Term validation requires extracted terms."]
+    assert update["execution_trace"][0].status == "ERROR"
 
 
 def test_compliance_agent_failure_escalates_with_review_packet(monkeypatch) -> None:

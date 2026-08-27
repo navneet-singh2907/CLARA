@@ -143,6 +143,22 @@ class GraphState(TypedDict):
     execution_trace: Annotated[list[ExecutionTraceEntry], operator.add]
 
 
+class GraphStateUpdate(TypedDict, total=False):
+    """Partial update returned by a LangGraph node."""
+
+    loan_case: LoanCase
+    review_policy: ReviewPolicy
+    extracted_terms: ExtractedTerms | None
+    validation_errors: list[str]
+    compliance: ComplianceResult | None
+    risk: RiskResult | None
+    contradictions: list[ContradictionResult]
+    counterfactuals: list[CounterfactualResult]
+    review_packet: ReviewPacket | None
+    agent_errors: list[str]
+    execution_trace: list[ExecutionTraceEntry]
+
+
 def initial_state(loan_case: LoanCase, review_policy: ReviewPolicy = "sba_reviewer") -> GraphState:
     return {
         "loan_case": loan_case,
@@ -159,9 +175,25 @@ def initial_state(loan_case: LoanCase, review_policy: ReviewPolicy = "sba_review
     }
 
 
-def validate_terms_node(state: GraphState) -> GraphState:
+def validate_terms_node(state: GraphState) -> GraphStateUpdate:
     started_at = perf_counter()
     terms = state["extracted_terms"]
+    if terms is None:
+        error_message = "Term validation requires extracted terms."
+        return {
+            "validation_errors": [error_message],
+            "agent_errors": [error_message],
+            "execution_trace": [
+                ExecutionTraceEntry(
+                    node="schema_validator",
+                    stage="validation",
+                    parallel_group=None,
+                    duration_ms=round((perf_counter() - started_at) * 1000, 3),
+                    status="ERROR",
+                )
+            ],
+        }
+
     errors: list[str] = []
 
     if terms.loan_amount <= 0:
@@ -195,7 +227,6 @@ def validate_terms_node(state: GraphState) -> GraphState:
         errors.append("Years in business cannot be negative.")
 
     return {
-        **state,
         "validation_errors": errors,
         "execution_trace": [
             ExecutionTraceEntry(

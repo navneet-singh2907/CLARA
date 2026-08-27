@@ -1,5 +1,7 @@
 """Compliance Checker Agent."""
 
+from typing import Literal
+
 from loan_pipeline.config import get_settings
 from loan_pipeline.graph.state import (
     ComplianceFinding,

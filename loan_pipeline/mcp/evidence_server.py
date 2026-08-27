@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 from dataclasses import asdict
-from typing import Any, BinaryIO, Literal
+from pathlib import Path
+from typing import Any, BinaryIO, Literal, TypedDict, cast
 
 from loan_pipeline.config import (
     GOLD_SET_JSON,
@@ -33,7 +33,14 @@ SERVER_VERSION = "0.1.0"
 
 DatasetName = Literal["product_demo", "week4"]
 
-DATASETS = {
+
+class DatasetConfig(TypedDict):
+    cases_path: Path
+    gold_path: Path
+    description: str
+
+
+DATASETS: dict[DatasetName, DatasetConfig] = {
     "product_demo": {
         "cases_path": SBA_LOANS_CSV,
         "gold_path": GOLD_SET_JSON,
@@ -190,6 +197,7 @@ def handle_request(request: dict[str, Any]) -> dict[str, Any] | None:
     request_id = request.get("id")
     method = request.get("method")
     params = request.get("params") or {}
+    result: dict[str, Any]
 
     try:
         if method == "initialize":
@@ -199,7 +207,7 @@ def handle_request(request: dict[str, Any]) -> dict[str, Any] | None:
                 "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
             }
         elif method == "tools/list":
-            result = {"tools": [tool["name"] for tool in list_tools()]}
+            result = {"tools": list_tools()}
         elif method == "tools/call":
             result = call_tool(params.get("name", ""), params.get("arguments") or {})
         elif method in {"notifications/initialized", "initialized"}:
@@ -328,11 +336,11 @@ def _inspect_pipeline_trace(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 def _load_cases(dataset: DatasetName):
-    return load_sba_demo_cases(Path(DATASETS[dataset]["cases_path"]))
+    return load_sba_demo_cases(DATASETS[dataset]["cases_path"])
 
 
 def _load_labels(dataset: DatasetName):
-    return load_gold_labels(Path(DATASETS[dataset]["gold_path"]))
+    return load_gold_labels(DATASETS[dataset]["gold_path"])
 
 
 def _case_by_id(case_id: str, dataset: DatasetName):
@@ -352,17 +360,23 @@ def _gold_label_by_id(case_id: str, dataset: DatasetName):
 
 
 def _dataset_name(raw_value: Any) -> DatasetName:
-    dataset = raw_value or "product_demo"
-    if dataset not in DATASETS:
-        raise MCPToolError(f"Unknown dataset: {dataset}. Expected one of {list(DATASETS)}.")
-    return dataset
+    if raw_value is None:
+        return "product_demo"
+    if not isinstance(raw_value, str) or raw_value not in DATASETS:
+        raise MCPToolError(
+            f"Unknown dataset: {raw_value}. Expected one of {list(DATASETS)}."
+        )
+    return cast(DatasetName, raw_value)
 
 
 def _review_policy(raw_value: Any) -> ReviewPolicy:
-    policy = raw_value or "sba_reviewer"
-    if policy not in POLICY_PROFILES:
-        raise MCPToolError(f"Unknown review policy: {policy}. Expected one of {list(POLICY_PROFILES)}.")
-    return policy
+    if raw_value is None:
+        return "sba_reviewer"
+    if not isinstance(raw_value, str) or raw_value not in POLICY_PROFILES:
+        raise MCPToolError(
+            f"Unknown review policy: {raw_value}. Expected one of {list(POLICY_PROFILES)}."
+        )
+    return cast(ReviewPolicy, raw_value)
 
 
 def _required_str(arguments: dict[str, Any], key: str) -> str:
