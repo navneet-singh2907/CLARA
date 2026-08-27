@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 from time import perf_counter
-from typing import Literal, cast
+from typing import Literal
 
 from langgraph.graph import END as LANGGRAPH_END
 from langgraph.graph import START as LANGGRAPH_START
@@ -28,6 +28,7 @@ from loan_pipeline.graph.state import (
     GraphState,
     GraphStateUpdate,
     LoanCase,
+    ReviewOutcome,
     ReviewPacket,
     ReviewPolicy,
     RiskResult,
@@ -321,9 +322,47 @@ def synthesize_review_packet(
     agent_errors: list[str] | None = None,
     review_policy: ReviewPolicy = "sba_reviewer",
 ) -> ReviewPacket:
-    human_review_notes: list[str] = []
     agent_errors = agent_errors or []
-    contradictions = [
+    contradictions = _contradiction_results(compliance, risk)
+    counterfactuals = _counterfactual_results(terms, compliance, risk)
+    human_review_notes = _human_review_notes(
+        terms,
+        compliance,
+        risk,
+        validation_errors,
+        agent_errors,
+        contradictions,
+    )
+    recommended_outcome = _recommended_outcome(
+        terms,
+        compliance,
+        risk,
+        validation_errors,
+        agent_errors,
+        contradictions,
+    )
+    summary = _review_summary(terms, compliance, risk, recommended_outcome, agent_errors)
+
+    return ReviewPacket(
+        case_id=terms.case_id,
+        review_policy=review_policy,
+        recommended_outcome=recommended_outcome,
+        escalation_required=bool(human_review_notes),
+        summary=summary,
+        extracted_terms=terms,
+        compliance=compliance,
+        risk=risk,
+        human_review_notes=human_review_notes,
+        contradictions=contradictions,
+        counterfactuals=counterfactuals,
+    )
+
+
+def _contradiction_results(
+    compliance: ComplianceResult,
+    risk: RiskResult,
+) -> list[ContradictionResult]:
+    return [
         ContradictionResult(
             severity=contradiction.severity,
             title=contradiction.title,
@@ -333,7 +372,14 @@ def synthesize_review_packet(
         )
         for contradiction in detect_contradictions(compliance, risk)
     ]
-    counterfactuals = [
+
+
+def _counterfactual_results(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+) -> list[CounterfactualResult]:
+    return [
         CounterfactualResult(
             type=counterfactual.type,
             title=counterfactual.title,
@@ -344,27 +390,60 @@ def synthesize_review_packet(
         for counterfactual in generate_counterfactuals(terms, compliance, risk)
     ]
 
-    if validation_errors:
-        human_review_notes.extend(validation_errors)
 
-    if agent_errors:
-        human_review_notes.extend(f"Agent failure: {error}" for error in agent_errors)
+def _human_review_notes(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+    validation_errors: list[str],
+    agent_errors: list[str],
+    contradictions: list[ContradictionResult],
+) -> list[str]:
+    notes = list(validation_errors)
+    notes.extend(f"Agent failure: {error}" for error in agent_errors)
 
     if compliance.status == "FAIL":
-        human_review_notes.append("Compliance blocker or high-severity finding requires review.")
-
+        notes.append("Compliance blocker or high-severity finding requires review.")
     if risk.band == "HIGH":
-        human_review_notes.append("High credit risk requires loan officer review.")
-
+        notes.append("High credit risk requires loan officer review.")
     if _requires_extraction_confidence_review(terms):
-        human_review_notes.append("Extraction confidence is below target threshold.")
-
+        notes.append("Extraction confidence is below target threshold.")
     if contradictions:
-        human_review_notes.append("Agent contradiction detected; human adjudication required.")
+        notes.append("Agent contradiction detected; human adjudication required.")
+    return notes
 
-    escalation_required = bool(human_review_notes)
 
-    if (
+def _recommended_outcome(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+    validation_errors: list[str],
+    agent_errors: list[str],
+    contradictions: list[ContradictionResult],
+) -> ReviewOutcome:
+    if _requires_escalation(
+        terms,
+        compliance,
+        risk,
+        validation_errors,
+        agent_errors,
+        contradictions,
+    ):
+        return "ESCALATE"
+    if compliance.status == "REVIEW" or risk.band == "MEDIUM":
+        return "CONDITIONAL_REVIEW"
+    return "APPROVE"
+
+
+def _requires_escalation(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+    validation_errors: list[str],
+    agent_errors: list[str],
+    contradictions: list[ContradictionResult],
+) -> bool:
+    return bool(
         agent_errors
         or validation_errors
         or contradictions
@@ -372,36 +451,23 @@ def synthesize_review_packet(
         or risk.band == "HIGH"
         or terms.confidence < 0.60
         or _is_non_loan_or_irrelevant_input(terms)
-    ):
-        recommended_outcome = "ESCALATE"
-    elif compliance.status == "REVIEW" or risk.band == "MEDIUM":
-        recommended_outcome = "CONDITIONAL_REVIEW"
-    else:
-        recommended_outcome = "APPROVE"
+    )
 
+
+def _review_summary(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+    recommended_outcome: ReviewOutcome,
+    agent_errors: list[str],
+) -> str:
     summary = (
         f"{terms.borrower_name} is classified as {risk.band} risk with compliance status "
         f"{compliance.status}. Recommended outcome: {recommended_outcome}."
     )
     if agent_errors:
         summary += " One or more specialist agents failed, so manual review is required."
-
-    return ReviewPacket(
-        case_id=terms.case_id,
-        review_policy=review_policy,
-        recommended_outcome=cast(
-            Literal["APPROVE", "CONDITIONAL_REVIEW", "ESCALATE", "REJECT"],
-            recommended_outcome,
-        ),
-        escalation_required=escalation_required,
-        summary=summary,
-        extracted_terms=terms,
-        compliance=compliance,
-        risk=risk,
-        human_review_notes=human_review_notes,
-        contradictions=contradictions,
-        counterfactuals=counterfactuals,
-    )
+    return summary
 
 
 def _requires_extraction_confidence_review(terms: ExtractedTerms) -> bool:
