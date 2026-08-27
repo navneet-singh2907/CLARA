@@ -87,10 +87,12 @@ def run_inter_rater_report(
 
 
 def summarize_inter_rater_agreement(pair_scores: list[JudgePairScore]) -> dict[str, Any]:
-    comparisons = []
-    disagreement_cases = []
-    case_rows = []
-    dimension_deltas = {dimension: [] for dimension in JUDGE_DIMENSIONS}
+    comparisons: list[int] = []
+    disagreement_cases: list[dict[str, Any]] = []
+    case_rows: list[dict[str, Any]] = []
+    dimension_deltas: dict[str, list[int]] = {
+        dimension: [] for dimension in JUDGE_DIMENSIONS
+    }
 
     for pair_score in pair_scores:
         case_deltas = {

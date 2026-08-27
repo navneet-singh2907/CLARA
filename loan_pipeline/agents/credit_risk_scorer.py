@@ -1,10 +1,9 @@
 """Credit Risk Scorer Agent."""
 
 from loan_pipeline.config import get_settings
-from loan_pipeline.graph.state import ExtractedTerms, ReviewPolicy, RiskResult
+from loan_pipeline.graph.state import ExtractedTerms, ReviewPolicy, RiskBand, RiskResult
 from loan_pipeline.llm.client import add_llm_risk_rationale
 from loan_pipeline.review.policies import get_policy_profile
-from typing import cast, Literal
 
 
 def run_credit_risk_scorer(
@@ -26,31 +25,98 @@ def run_credit_risk_scorer_deterministic(
     primary_risk_factors: list[str] = []
     mitigating_factors: list[str] = []
 
-    if terms.borrower_credit_score is None:
-        points += 1
+    points += _score_credit_profile(terms, primary_risk_factors, mitigating_factors)
+    points += _score_operating_history(terms, primary_risk_factors, mitigating_factors)
+    points += _score_default_history(terms, primary_risk_factors)
+    points += _score_contextual_risks(terms, primary_risk_factors)
+    points += _apply_job_and_policy_impact(
+        terms,
+        profile.label,
+        profile.mission_jobs_threshold,
+        profile.mission_impact_credit,
+        mitigating_factors,
+    )
+
+    score = min(max(points, 1), 5)
+    band: RiskBand
+    if score >= profile.high_risk_min_score:
+        band = "HIGH"
+    elif score >= profile.medium_risk_min_score:
+        band = "MEDIUM"
+    else:
+        band = "LOW"
+
+    confidence = 0.85
+    if terms.borrower_credit_score is None or terms.years_in_business is None:
+        confidence -= 0.15
+
+    rationale = (
+        f"Risk score {score}/5 based on credit profile, operating history, prior default, "
+        f"loan size, job support, and {profile.label} tolerance."
+    )
+
+    return RiskResult(
+        score=score,
+        band=band,
+        confidence=max(confidence, 0.50),
+        primary_risk_factors=primary_risk_factors,
+        mitigating_factors=mitigating_factors,
+        rationale=rationale,
+    )
+
+
+def _score_credit_profile(
+    terms: ExtractedTerms,
+    primary_risk_factors: list[str],
+    mitigating_factors: list[str],
+) -> int:
+    credit_score = terms.borrower_credit_score
+    if credit_score is None:
         primary_risk_factors.append("Credit score is missing.")
-    elif terms.borrower_credit_score < 600:
-        points += 2
+        return 1
+    if credit_score < 600:
         primary_risk_factors.append("Borrower credit score is severely below threshold.")
-    elif terms.borrower_credit_score < 640:
-        points += 1
+        return 2
+    if credit_score < 640:
         primary_risk_factors.append("Borrower credit score is below 640.")
-    elif terms.borrower_credit_score >= 700:
+        return 1
+    if credit_score >= 700:
         mitigating_factors.append("Borrower credit score is above 700.")
+    return 0
 
-    if terms.years_in_business is None:
-        points += 1
+
+def _score_operating_history(
+    terms: ExtractedTerms,
+    primary_risk_factors: list[str],
+    mitigating_factors: list[str],
+) -> int:
+    years_in_business = terms.years_in_business
+    if years_in_business is None:
         primary_risk_factors.append("Years in business is missing.")
-    elif terms.years_in_business < 2:
-        points += 1
+        return 1
+    if years_in_business < 2:
         primary_risk_factors.append("Business has less than two years operating history.")
-    elif terms.years_in_business >= 5:
+        return 1
+    if years_in_business >= 5:
         mitigating_factors.append("Business has at least five years operating history.")
+    return 0
 
-    if terms.prior_default:
-        points += 2
-        primary_risk_factors.append("Prior default is disclosed.")
 
+def _score_default_history(
+    terms: ExtractedTerms,
+    primary_risk_factors: list[str],
+) -> int:
+    if not terms.prior_default:
+        return 0
+    primary_risk_factors.append("Prior default is disclosed.")
+    return 2
+
+
+def _score_contextual_risks(
+    terms: ExtractedTerms,
+    primary_risk_factors: list[str],
+) -> int:
+    points = 0
     if (
         terms.loan_amount >= 900_000
         and terms.years_in_business is not None
@@ -73,38 +139,20 @@ def run_credit_risk_scorer_deterministic(
         primary_risk_factors.append(
             "Large request depends on unverified customer contracts from a young business."
         )
+    return points
 
+
+def _apply_job_and_policy_impact(
+    terms: ExtractedTerms,
+    policy_label: str,
+    mission_jobs_threshold: int,
+    mission_impact_credit: int,
+    mitigating_factors: list[str],
+) -> int:
     if terms.jobs_supported >= 10:
         mitigating_factors.append("Application supports at least ten jobs.")
 
-    if profile.mission_impact_credit and terms.jobs_supported >= profile.mission_jobs_threshold:
-        points -= profile.mission_impact_credit
-        mitigating_factors.append(
-            f"{profile.label} policy credits strong mission/job impact."
-        )
-
-    score = min(max(points, 1), 5)
-    if score >= profile.high_risk_min_score:
-        band = "HIGH"
-    elif score >= profile.medium_risk_min_score:
-        band = "MEDIUM"
-    else:
-        band = "LOW"
-
-    confidence = 0.85
-    if terms.borrower_credit_score is None or terms.years_in_business is None:
-        confidence -= 0.15
-
-    rationale = (
-        f"Risk score {score}/5 based on credit profile, operating history, prior default, "
-        f"loan size, job support, and {profile.label} tolerance."
-    )
-
-    return RiskResult(
-        score=score,
-        band=cast(Literal["LOW", "MEDIUM", "HIGH"], band),
-        confidence=max(confidence, 0.50),
-        primary_risk_factors=primary_risk_factors,
-        mitigating_factors=mitigating_factors,
-        rationale=rationale,
-    )
+    if mission_impact_credit and terms.jobs_supported >= mission_jobs_threshold:
+        mitigating_factors.append(f"{policy_label} policy credits strong mission/job impact.")
+        return -mission_impact_credit
+    return 0

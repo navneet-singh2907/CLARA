@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from time import perf_counter
+from typing import Literal
 
 from langgraph.graph import END as LANGGRAPH_END
 from langgraph.graph import START as LANGGRAPH_START
@@ -25,7 +26,9 @@ from loan_pipeline.graph.state import (
     ExecutionTraceEntry,
     ExtractedTerms,
     GraphState,
+    GraphStateUpdate,
     LoanCase,
+    ReviewOutcome,
     ReviewPacket,
     ReviewPolicy,
     RiskResult,
@@ -88,10 +91,7 @@ def build_review_graph():
 
     return workflow.compile()
 
-
-from typing import Literal
-
-def term_extractor_node(state: GraphState) -> GraphState:
+def term_extractor_node(state: GraphState) -> GraphStateUpdate:
     started_at = perf_counter()
     loan_case = state["loan_case"]
     terms = trace_call(
@@ -103,7 +103,6 @@ def term_extractor_node(state: GraphState) -> GraphState:
         tags=["agent", "term-extractor"],
     )
     return {
-        **state,
         "extracted_terms": terms,
         "execution_trace": [
             _trace_entry(
@@ -116,13 +115,12 @@ def term_extractor_node(state: GraphState) -> GraphState:
     }
 
 
-def compliance_checker_node(state: GraphState) -> GraphState:
+def compliance_checker_node(state: GraphState) -> GraphStateUpdate:
     started_at = perf_counter()
     terms = state["extracted_terms"]
     review_policy = state["review_policy"]
     if terms is None:
         return {
-            **state,
             "agent_errors": ["Compliance checker missing terms."],
             "execution_trace": [
                 _trace_entry(
@@ -148,7 +146,6 @@ def compliance_checker_node(state: GraphState) -> GraphState:
             tags=["agent", "compliance", "parallel-specialist-review"],
         )
         return {
-            **state,
             "compliance": compliance,
             "execution_trace": [
                 _trace_entry(
@@ -162,7 +159,6 @@ def compliance_checker_node(state: GraphState) -> GraphState:
     except Exception as exc:
         error_message = f"Compliance checker failed: {exc}"
         return {
-            **state,
             "compliance": _fallback_compliance_result(error_message),
             "agent_errors": [error_message],
             "execution_trace": [
@@ -177,13 +173,12 @@ def compliance_checker_node(state: GraphState) -> GraphState:
         }
 
 
-def credit_risk_scorer_node(state: GraphState) -> GraphState:
+def credit_risk_scorer_node(state: GraphState) -> GraphStateUpdate:
     started_at = perf_counter()
     terms = state["extracted_terms"]
     review_policy = state["review_policy"]
     if terms is None:
         return {
-            **state,
             "agent_errors": ["Credit risk scorer missing terms."],
             "execution_trace": [
                 _trace_entry(
@@ -209,7 +204,6 @@ def credit_risk_scorer_node(state: GraphState) -> GraphState:
             tags=["agent", "credit-risk", "parallel-specialist-review"],
         )
         return {
-            **state,
             "risk": risk,
             "execution_trace": [
                 _trace_entry(
@@ -223,7 +217,6 @@ def credit_risk_scorer_node(state: GraphState) -> GraphState:
     except Exception as exc:
         error_message = f"Credit risk scorer failed: {exc}"
         return {
-            **state,
             "risk": _fallback_risk_result(error_message),
             "agent_errors": [error_message],
             "execution_trace": [
@@ -238,7 +231,7 @@ def credit_risk_scorer_node(state: GraphState) -> GraphState:
         }
 
 
-def synthesizer_node(state: GraphState) -> GraphState:
+def synthesizer_node(state: GraphState) -> GraphStateUpdate:
     started_at = perf_counter()
     terms = state["extracted_terms"]
     compliance = state["compliance"]
@@ -255,7 +248,6 @@ def synthesizer_node(state: GraphState) -> GraphState:
 
     if missing_outputs:
         return {
-            **state,
             "agent_errors": [
                 f"Synthesizer missing required outputs: {', '.join(missing_outputs)}.",
             ],
@@ -269,6 +261,10 @@ def synthesizer_node(state: GraphState) -> GraphState:
                 )
             ],
         }
+
+    assert terms is not None
+    assert compliance is not None
+    assert risk is not None
 
     packet = trace_call(
         name="Review Synthesizer",
@@ -287,7 +283,6 @@ def synthesizer_node(state: GraphState) -> GraphState:
     )
 
     return {
-        **state,
         "review_packet": packet,
         "contradictions": packet.contradictions,
         "counterfactuals": packet.counterfactuals,
@@ -327,9 +322,47 @@ def synthesize_review_packet(
     agent_errors: list[str] | None = None,
     review_policy: ReviewPolicy = "sba_reviewer",
 ) -> ReviewPacket:
-    human_review_notes: list[str] = []
     agent_errors = agent_errors or []
-    contradictions = [
+    contradictions = _contradiction_results(compliance, risk)
+    counterfactuals = _counterfactual_results(terms, compliance, risk)
+    human_review_notes = _human_review_notes(
+        terms,
+        compliance,
+        risk,
+        validation_errors,
+        agent_errors,
+        contradictions,
+    )
+    recommended_outcome = _recommended_outcome(
+        terms,
+        compliance,
+        risk,
+        validation_errors,
+        agent_errors,
+        contradictions,
+    )
+    summary = _review_summary(terms, compliance, risk, recommended_outcome, agent_errors)
+
+    return ReviewPacket(
+        case_id=terms.case_id,
+        review_policy=review_policy,
+        recommended_outcome=recommended_outcome,
+        escalation_required=bool(human_review_notes),
+        summary=summary,
+        extracted_terms=terms,
+        compliance=compliance,
+        risk=risk,
+        human_review_notes=human_review_notes,
+        contradictions=contradictions,
+        counterfactuals=counterfactuals,
+    )
+
+
+def _contradiction_results(
+    compliance: ComplianceResult,
+    risk: RiskResult,
+) -> list[ContradictionResult]:
+    return [
         ContradictionResult(
             severity=contradiction.severity,
             title=contradiction.title,
@@ -339,7 +372,14 @@ def synthesize_review_packet(
         )
         for contradiction in detect_contradictions(compliance, risk)
     ]
-    counterfactuals = [
+
+
+def _counterfactual_results(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+) -> list[CounterfactualResult]:
+    return [
         CounterfactualResult(
             type=counterfactual.type,
             title=counterfactual.title,
@@ -350,62 +390,84 @@ def synthesize_review_packet(
         for counterfactual in generate_counterfactuals(terms, compliance, risk)
     ]
 
-    if validation_errors:
-        human_review_notes.extend(validation_errors)
 
-    if agent_errors:
-        human_review_notes.extend(f"Agent failure: {error}" for error in agent_errors)
+def _human_review_notes(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+    validation_errors: list[str],
+    agent_errors: list[str],
+    contradictions: list[ContradictionResult],
+) -> list[str]:
+    notes = list(validation_errors)
+    notes.extend(f"Agent failure: {error}" for error in agent_errors)
 
     if compliance.status == "FAIL":
-        human_review_notes.append("Compliance blocker or high-severity finding requires review.")
-
+        notes.append("Compliance blocker or high-severity finding requires review.")
     if risk.band == "HIGH":
-        human_review_notes.append("High credit risk requires loan officer review.")
-
+        notes.append("High credit risk requires loan officer review.")
     if _requires_extraction_confidence_review(terms):
-        human_review_notes.append("Extraction confidence is below target threshold.")
-
+        notes.append("Extraction confidence is below target threshold.")
     if contradictions:
-        human_review_notes.append("Agent contradiction detected; human adjudication required.")
+        notes.append("Agent contradiction detected; human adjudication required.")
+    return notes
 
-    escalation_required = bool(human_review_notes)
 
-    if (
-       agent_errors
-       or
-       validation_errors
-       or contradictions
-       or compliance.status == "FAIL"
-       or risk.band == "HIGH"
-       or terms.confidence < 0.60
-       or _is_non_loan_or_irrelevant_input(terms)
-   ):
-       recommended_outcome = "ESCALATE"
-   elif compliance.status == "REVIEW" or risk.band == "MEDIUM":
-       recommended_outcome = "CONDITIONAL_REVIEW"
-   else:
-       recommended_outcome = "APPROVE"
+def _recommended_outcome(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+    validation_errors: list[str],
+    agent_errors: list[str],
+    contradictions: list[ContradictionResult],
+) -> ReviewOutcome:
+    if _requires_escalation(
+        terms,
+        compliance,
+        risk,
+        validation_errors,
+        agent_errors,
+        contradictions,
+    ):
+        return "ESCALATE"
+    if compliance.status == "REVIEW" or risk.band == "MEDIUM":
+        return "CONDITIONAL_REVIEW"
+    return "APPROVE"
 
-   summary = (
-       f"{terms.borrower_name} is classified as {risk.band} risk with compliance status "
-       f"{compliance.status}. Recommended outcome: {recommended_outcome}."
-   )
-   if agent_errors:
-       summary += " One or more specialist agents failed, so manual review is required."
 
-   return ReviewPacket(
-       case_id=terms.case_id,
-       review_policy=review_policy,
-       recommended_outcome=cast(Literal["APPROVE", "CONDITIONAL_REVIEW", "ESCALATE", "REJECT"], recommended_outcome),
-       escalation_required=escalation_required,
-       summary=summary,
-       extracted_terms=terms,
-       compliance=compliance,
-       risk=risk,
-       human_review_notes=human_review_notes,
-       contradictions=contradictions,
-       counterfactuals=counterfactuals,
-   )
+def _requires_escalation(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+    validation_errors: list[str],
+    agent_errors: list[str],
+    contradictions: list[ContradictionResult],
+) -> bool:
+    return bool(
+        agent_errors
+        or validation_errors
+        or contradictions
+        or compliance.status == "FAIL"
+        or risk.band == "HIGH"
+        or terms.confidence < 0.60
+        or _is_non_loan_or_irrelevant_input(terms)
+    )
+
+
+def _review_summary(
+    terms: ExtractedTerms,
+    compliance: ComplianceResult,
+    risk: RiskResult,
+    recommended_outcome: ReviewOutcome,
+    agent_errors: list[str],
+) -> str:
+    summary = (
+        f"{terms.borrower_name} is classified as {risk.band} risk with compliance status "
+        f"{compliance.status}. Recommended outcome: {recommended_outcome}."
+    )
+    if agent_errors:
+        summary += " One or more specialist agents failed, so manual review is required."
+    return summary
 
 
 def _requires_extraction_confidence_review(terms: ExtractedTerms) -> bool:
@@ -418,6 +480,7 @@ def _requires_extraction_confidence_review(terms: ExtractedTerms) -> bool:
         or terms.borrower_credit_score is None
         or terms.years_in_business is None
     )
+
 
 def _is_non_loan_or_irrelevant_input(terms: ExtractedTerms) -> bool:
     return (

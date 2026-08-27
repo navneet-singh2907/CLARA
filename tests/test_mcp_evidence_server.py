@@ -42,7 +42,9 @@ def test_handle_request_returns_mcp_tools_list() -> None:
 
     assert response is not None
     assert response["id"] == 1
-    assert response["result"]["tools"]
+    tools = response["result"]["tools"]
+    assert tools
+    assert all({"name", "description", "inputSchema"} <= tool.keys() for tool in tools)
 
 
 def test_handle_request_returns_tool_error_for_unknown_case() -> None:

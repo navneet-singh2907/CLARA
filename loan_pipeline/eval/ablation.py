@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal, cast
 
 from loan_pipeline.agents.compliance_checker import run_compliance_checker
 from loan_pipeline.agents.credit_risk_scorer import run_credit_risk_scorer
@@ -25,7 +25,7 @@ AblationRunner = Callable[[LoanCase], ReviewPacket]
 def run_ablation_study(
     gold_path: Path | None = None,
     cases_path: Path | None = None,
-) -> dict[str, object]:
+) -> dict[str, dict[str, object]]:
     case_rows = load_sba_demo_cases(cases_path) if cases_path else load_sba_demo_cases()
     cases = {loan_case.case_id: loan_case for loan_case in case_rows}
     labels = load_gold_labels(gold_path) if gold_path else load_gold_labels()
@@ -38,7 +38,7 @@ def run_ablation_study(
         "single_agent_baseline_stub": run_single_agent_baseline_stub,
     }
 
-    results = {}
+    results: dict[str, dict[str, object]] = {}
     for config_name, runner in configs.items():
         scores: list[CaseScore] = []
         for label in labels:
@@ -46,7 +46,7 @@ def run_ablation_study(
             packet = runner(loan_case)
             scores.append(score_case(loan_case, packet, label))
 
-        results[config_name] = summarize_scores(scores)["overall"]
+        results[config_name] = cast(dict[str, object], summarize_scores(scores)["overall"])
 
     return results
 
@@ -122,7 +122,6 @@ def _single_agent_compliance_guess(terms: ExtractedTerms) -> ComplianceResult:
 
 
 def _single_agent_risk_guess(terms: ExtractedTerms) -> RiskResult:
-    from typing import Literal
     band: Literal["LOW", "MEDIUM", "HIGH"]
     if terms.prior_default or terms.loan_amount >= 900000:
         band = "HIGH"

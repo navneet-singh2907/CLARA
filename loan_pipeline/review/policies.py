@@ -1,6 +1,7 @@
 """Reviewer policy profiles for institutional review modes."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 from loan_pipeline.graph.state import ReviewPolicy
 
@@ -11,7 +12,7 @@ class PolicyProfile:
     label: str
     compliance_guarantee_review_threshold: float
     compliance_guarantee_high_threshold: float
-    prior_default_severity: str
+    prior_default_severity: Literal["LOW", "MEDIUM", "HIGH"]
     high_risk_min_score: int
     medium_risk_min_score: int
     mission_jobs_threshold: int
